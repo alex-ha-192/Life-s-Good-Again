@@ -6,14 +6,16 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   width: 1920px; height: 1080px; overflow: hidden; color: #fff;
-  background: radial-gradient(120% 90% at 50% 0%, #14315a, #0a1830 55%, #060d1c);
+  background: #0a1830;   /* flat: a full-screen gradient has to be repainted under every change on the TV */
   font-family: "Tiles Sans", "Segoe UI", "Open Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 #ring { position: absolute; inset: 0; }
 /* Motion is off by default (instant, like before). Settings > Animations turns on one short slide
    of the pages, transform only, which the TV composites without repainting. */
-.col { position: absolute; top: 60px; width: 640px; transform-origin: 50% 0; cursor: pointer; }
+/* each page is its own GPU layer, so changing one row never repaints the others or the scaled side pages */
+.col { position: absolute; top: 60px; width: 640px; transform-origin: 50% 0; cursor: pointer;
+  will-change: transform, opacity; -webkit-backface-visibility: hidden; contain: layout paint; }
 .motion .col { transition: transform .16s ease-out, opacity .16s ease-out; }
 .motion .col.jump { transition: none; }
 .col h2 { font-size: 80px; font-weight: 300; letter-spacing: -2px; line-height: 1; margin-bottom: 26px; white-space: nowrap; }
@@ -21,7 +23,7 @@ html, body {
 .r { display: flex; align-items: center; gap: 26px; height: 100px; padding: 0 18px 0 12px; }
 .ic { flex: none; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;
   overflow: hidden; font-size: 34px; font-weight: 600; }
-.ic img { width: 100%; height: 100%; object-fit: cover; }
+.ic img { width: 80px; height: 80px; }
 .ic svg { width: 44px; height: 44px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .t { font-size: 40px; font-weight: 300; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fav { flex: none; width: 30px; height: 30px; fill: #8ff0e3; }
@@ -47,3 +49,4 @@ html, body {
 #hints .k.y { background: #f2c400; }
 #hints .k.r { background: #e0323e; }
 #hints .sep { display: inline-block; width: 44px; }
+#speed { position: absolute; right: 110px; top: 6px; font-size: 24px; color: #8ff0e3; }

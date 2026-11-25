@@ -92,7 +92,7 @@
       luna("luna://com.webos.applicationManager/listLaunchPoints", {}, function (r) {
         st.lpOk = !!(r && r.launchPoints);
         ((r && r.launchPoints) || []).forEach(function (lp) {
-          var icon = lp.largeIcon || lp.icon;
+          var icon = lp.icon || lp.largeIcon;   // the small one: 80px is all we draw, big PNGs cost decode + scaling
           if (seen[lp.id]) { if (!seen[lp.id].icon && icon) seen[lp.id].icon = icon; return; }
           addApp(seen, { id: lp.id, title: lp.title, icon: icon, color: lp.iconColor || lp.bgColor });
         });
@@ -125,6 +125,7 @@
       { id: "com.webos.app.home", title: "LG Home", glyph: "home", color: "#39414b" },
       { action: "extend", id: "tiles:extend", title: devTitle(), glyph: "renew", color: "#39414b" },
       { action: "motion", id: "tiles:motion", title: motionOn() ? "Animations: on" : "Animations: off", glyph: "renew", color: "#39414b" },
+      { action: "speed", id: "tiles:speed", title: speedOn ? "Speed readout: on" : "Speed readout: off", glyph: "code", color: "#39414b" },
       { action: "reset", id: "tiles:reset", title: "Reset favourites", glyph: "reset", color: "#39414b" }
     ].filter(function (x) { return hasDevMode() || (x.id !== "com.palmdts.devmode" && x.action !== "extend"); });
     var all = {};
@@ -257,6 +258,7 @@
     hints();
   }
   // What the coloured buttons do right now, shown bottom left.
+  var lastHints = "";
   function hints() {
     var it = current(), h = [];
     var Y = '<i class="k y"></i>', R = '<i class="k r"></i>';
@@ -268,7 +270,8 @@
       h.push("<b>\u25C0 \u25B6</b> pages");
       if (st.p !== 0) h.push("<b>Back</b> favourites");
     }
-    $("hints").innerHTML = h.join('<span class="sep"></span>');
+    var html = h.join('<span class="sep"></span>');
+    if (html !== lastHints) { $("hints").innerHTML = html; lastHints = html; }
   }
   function replay() { firstPaint = true; }
   var toastTimer;
@@ -289,6 +292,11 @@
       try { localStorage.setItem(MOTION_KEY, motionOn() ? "off" : "on"); } catch (e) {}
       document.body.classList.toggle("motion", motionOn());
       buildPages(); render(); return;
+    }
+    if (it.action === "speed") {
+      speedOn = !speedOn;
+      try { localStorage.setItem(SPEED_KEY, speedOn ? "on" : "off"); } catch (e) {}
+      lat = []; startSpeed(); buildPages(); render(); return;
     }
     if (it.action === "reset") {
       try { localStorage.removeItem(FAV_KEY); } catch (e) {}
@@ -317,7 +325,7 @@
     var ia = st.favs.indexOf(items[i].id), ib = st.favs.indexOf(items[j].id);
     var tmp = st.favs[ia]; st.favs[ia] = st.favs[ib]; st.favs[ib] = tmp;
     st.sel[0] = j;
-    saveFavs(); buildPages(); render();
+    saveFavs(); buildPages(); schedule();
   }
 
   function key(code) {
@@ -325,7 +333,7 @@
       if (code === KEY.UP) moveFav(-1);
       else if (code === KEY.DOWN) moveFav(1);
       else if (code === KEY.OK || code === KEY.RED || code === KEY.R || code === KEY.BACK || code === KEY.ESC) {
-        st.moving = false; render(); toast("Order saved");
+        st.moving = false; schedule(); toast("Order saved");
       }
       return true;
     }
@@ -346,10 +354,51 @@
         st.p = 0; break;
       default: return false;
     }
-    render();
+    schedule();
     return true;
   }
-  document.addEventListener("keydown", function (e) { if (key(e.keyCode)) e.preventDefault(); });
+  // Held keys repeat faster than a slow TV can paint: apply every press to the state at once,
+  // but draw at most once per frame, so presses never queue up behind drawing.
+  var pending = false, raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+  function schedule() {
+    if (pending) return;
+    pending = true;
+    raf(function () { pending = false; render(); speedFrame(); });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (speedOn) speedKey();
+    if (key(e.keyCode)) e.preventDefault();
+  });
+
+  // ------------------------------------------------------------------ speed readout (Settings)
+  // Shows how long a key press takes to reach the screen, measured on the TV itself.
+  var SPEED_KEY = "tileshome.speed";
+  var speedOn = false; try { speedOn = localStorage.getItem(SPEED_KEY) === "on"; } catch (e) {}
+  var keyT = 0, lat = [], frames = [], lastF = 0;
+  function speedKey() { if (!keyT) keyT = performance.now(); }
+  function speedFrame() {
+    if (!speedOn || !keyT) return;
+    raf(function () {   // the frame after the one we drew in is when it's actually on screen
+      lat.push(performance.now() - keyT); keyT = 0;
+      if (lat.length > 20) lat.shift();
+      showSpeed();
+    });
+  }
+  function med(a) { if (!a.length) return 0; var b = a.slice().sort(function (x, y) { return x - y; }); return b[b.length >> 1]; }
+  function showSpeed() {
+    var el = $("speed"); if (!el) return;
+    if (!speedOn) { el.textContent = ""; return; }
+    var fps = frames.length > 1 ? 1000 / med(frames) : 0;
+    el.textContent = "key to screen: " + Math.round(med(lat)) + " ms (worst " + Math.round(Math.max.apply(null, lat.concat([0]))) +
+      ") \u00b7 " + Math.round(fps) + " fps idle \u00b7 " + document.getElementsByTagName("*").length + " nodes";
+  }
+  function speedLoop(t) {   // idle frame rate, sampled for 3 seconds after each change
+    if (lastF) frames.push(t - lastF);
+    if (frames.length > 60) frames.shift();
+    lastF = t;
+    if (speedOn && frames.length < 60) raf(speedLoop); else { lastF = 0; showSpeed(); }
+  }
+  function startSpeed() { frames = []; lastF = 0; if (speedOn) raf(speedLoop); showSpeed(); }
   // Magic Remote pointer: click a side page to go there, click a row to select it, click again to open.
   $("ring").addEventListener("click", function (e) {
     var col = e.target.closest ? e.target.closest(".col") : null;
@@ -380,5 +429,5 @@
   tick();
   document.body.classList.toggle("motion", motionOn());
   getJSON("config.json", function (c) { if (c) CFG = c; start(); });
-  function start() { loadFavs(function () { loadApps(function () { buildPages(); render(); setTimeout(maybeExtend, 1500); }); }); }
+  function start() { loadFavs(function () { loadApps(function () { buildPages(); render(); startSpeed(); setTimeout(maybeExtend, 1500); }); }); }
 })();
