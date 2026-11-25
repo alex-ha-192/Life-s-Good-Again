@@ -58,6 +58,14 @@ elif [ "${HOSTS:-1}" = 1 ] && [ -s "$D/hosts.block" ]; then
     fi
 fi
 
+# one luna call that prints its reply even where luna-send only prints to a terminal
+lsend() {
+    r=$(luna-send -n 1 -w 5000 "$1" "$2" </dev/null 2>/dev/null)
+    [ -z "$r" ] && command -v script >/dev/null 2>&1 && \
+        r=$(script -q -c "luna-send -n 1 -w 5000 $1 '$2'" /dev/null </dev/null 2>/dev/null | tr -d '\r')
+    printf '%s\n' "$r"
+}
+
 # --- 2. firewall -----------------------------------------------------------------------------
 fw() { # $1 = iptables or ip6tables, rest = resolver IPs
     T=$1; shift
@@ -65,14 +73,23 @@ fw() { # $1 = iptables or ip6tables, rest = resolver IPs
     $T -N LGKIT 2>/dev/null; $T -F LGKIT
     # keep whatever DNS server the TV is actually using, even if it's on the list
     in_use=$(sed -n 's/^nameserver[[:space:]]*//p' /etc/resolv.conf /var/run/resolv.conf /tmp/resolv.conf 2>/dev/null | tr '\n' ' ')
+    # REJECT fails fast for apps; some TV kernels lack it (seen for IPv6), so fall back to DROP
+    TGT=REJECT
+    $T -A LGKIT -p tcp --dport 853 -j REJECT 2>/dev/null || TGT=DROP
+    [ $TGT = DROP ] && $T -A LGKIT -p tcp --dport 853 -j DROP 2>/dev/null
+    $T -A LGKIT -p udp --dport 853 -j $TGT 2>/dev/null
     for ip in "$@"; do
         case " $in_use " in *" $ip "*) echo "firewall: $ip is your DNS server, not blocking it"; continue ;; esac
-        $T -A LGKIT -d "$ip" -j REJECT
+        $T -A LGKIT -d "$ip" -j $TGT 2>/dev/null
     done
-    $T -A LGKIT -p tcp --dport 853 -j REJECT
-    $T -A LGKIT -p udp --dport 853 -j REJECT
-    $T -C OUTPUT -j LGKIT 2>/dev/null || $T -I OUTPUT -j LGKIT
-    echo "firewall: $T rules in place ($($T -S LGKIT | grep -c REJECT) rules)"
+    n=$($T -S LGKIT 2>/dev/null | grep -c -- "-j $TGT")
+    if [ "$n" -gt 0 ]; then
+        $T -C OUTPUT -j LGKIT 2>/dev/null || $T -I OUTPUT -j LGKIT
+        echo "firewall: $T: $n rules ($TGT)"
+    else
+        $T -X LGKIT 2>/dev/null
+        echo "firewall: $T: FAILED, no rules could be added on this TV"
+    fi
 }
 if [ "${FIREWALL:-1}" = 1 ]; then
     fw iptables 8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 9.9.9.9 149.112.112.112 208.67.222.222 208.67.220.220 \
@@ -90,7 +107,7 @@ if [ -s "$D/lgkit-agent.js" ]; then
             # wait (in the background) for the app manager, then start the agent
             i=0
             while [ $i -lt 90 ]; do
-                luna-send -n 1 -w 2000 luna://com.webos.applicationManager/running '{}' 2>/dev/null | grep -q '"returnValue": *true' && break
+                lsend luna://com.webos.applicationManager/running '{}' | grep -q '"returnValue": *true' && break
                 i=$((i + 1)); sleep 2
             done
             sleep 6

@@ -583,11 +583,12 @@ def step_root(c):
     for line in text.splitlines():
         say("  | " + line)
     if p.returncode or "Done." not in text:
-        why = [l[2:] for l in text.splitlines() if l.startswith("! ")]
+        why = [l.strip()[8:].strip() for l in text.splitlines() if l.strip().startswith("FAILED")] \
+            or [l[2:] for l in text.splitlines() if l.startswith("! ")]
         if p.returncode == 255 and not text.strip():
             msg = "Couldn't log in over SSH. Check SSH Server is on in Homebrew Channel and the root password."
         elif why:
-            msg = why[-1]
+            msg = "; ".join(why)
         else:
             msg = f"install.sh stopped (exit {p.returncode}); see the lines above."
         c.fail("root", msg)

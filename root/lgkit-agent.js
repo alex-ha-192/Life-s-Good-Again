@@ -49,15 +49,42 @@ function log(m) {
 function saveStatus() {
   try { fs.writeFileSync(STATUS, JSON.stringify(status, null, 1)); } catch (e) {}
 }
+// Some webOS builds' luna-send only prints its reply to a terminal (seen on webOS 23). Then every
+// call goes through script(1), which gives it one. Decided once at start by probe().
+var VIA_SCRIPT = false;
+function q(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
+function lunaArgs(args) {
+  if (!VIA_SCRIPT) return { cmd: LUNA, args: args };
+  return { cmd: "script", args: ["-q", "-c", [LUNA].concat(args).map(q).join(" "), "/dev/null"] };
+}
+function parseReply(out) {
+  var s = String(out || "").replace(/\r/g, ""), i = s.indexOf("{");
+  if (i < 0) return null;
+  try { return JSON.parse(s.slice(i, s.lastIndexOf("}") + 1)); } catch (e) { return null; }
+}
 function luna(uri, params, cb) {
-  cp.execFile(LUNA, ["-n", "1", "-w", "5000", uri, JSON.stringify(params || {})], { timeout: 8000 },
+  var c = lunaArgs(["-n", "1", "-w", "5000", uri, JSON.stringify(params || {})]);
+  cp.execFile(c.cmd, c.args, { timeout: 10000 }, function (err, out) {
+    var r = parseReply(out);
+    if (cb) cb(r || { returnValue: false, errorText: err ? err.message : "no reply" });
+  });
+}
+function probe(cb) {
+  cp.execFile(LUNA, ["-n", "1", "-w", "5000", "luna://com.webos.applicationManager/running", "{}"], { timeout: 8000 },
     function (err, out) {
-      var r = null;
-      var s = String(out || "");
-      var i = s.indexOf("{");
-      if (i >= 0) { try { r = JSON.parse(s.slice(i)); } catch (e) {} }
-      if (cb) cb(err || !r ? (r || { returnValue: false, errorText: err ? err.message : "no reply" }) : r);
+      if (parseReply(out)) { status.luna = "direct"; return cb(); }
+      cp.execFile("script", ["-q", "-c", LUNA + " -n 1 -w 5000 luna://com.webos.applicationManager/running '{}'", "/dev/null"],
+        { timeout: 10000 }, function (e2, out2) {
+          if (parseReply(out2)) { VIA_SCRIPT = true; status.luna = "via script (luna-send only prints to a terminal here)"; }
+          else status.luna = "no replies (redirects rely on the Home key code; guard can't read settings)";
+          log("luna-send: " + status.luna);
+          cb();
+        });
     });
+}
+function subscribe(uri, params) {
+  var c = lunaArgs(["-i", uri, JSON.stringify(params)]);
+  return cp.spawn(c.cmd, c.args);
 }
 function toast(msg) {
   luna("luna://com.webos.notification/createToast", { sourceId: APP, message: msg }, function () {});
@@ -89,10 +116,10 @@ function onForeground(appId) {
   setTimeout(function () { launchTiles("LG Home came up: " + appId); }, 250);
 }
 function watchForeground() {
-  var p = cp.spawn(LUNA, ["-i", "luna://com.webos.applicationManager/getForegroundAppInfo", '{"subscribe":true}']);
+  var p = subscribe("luna://com.webos.applicationManager/getForegroundAppInfo", { subscribe: true });
   var buf = "";
   p.stdout.on("data", function (d) {
-    buf += d;
+    buf += String(d).replace(/\r/g, "");
     var lines = buf.split("\n");
     buf = lines.pop();
     lines.forEach(function (l) {
@@ -140,10 +167,10 @@ function onPowerOn(reason) {
   setTimeout(function () { guard(); }, 60000);
 }
 function watchPower() {
-  var p = cp.spawn(LUNA, ["-i", "luna://com.webos.service.tvpower/power/getPowerState", '{"subscribe":true}']);
+  var p = subscribe("luna://com.webos.service.tvpower/power/getPowerState", { subscribe: true });
   var buf = "", last = "";
   p.stdout.on("data", function (d) {
-    buf += d;
+    buf += String(d).replace(/\r/g, "");
     var lines = buf.split("\n");
     buf = lines.pop();
     lines.forEach(function (l) {
@@ -193,8 +220,10 @@ function guard(done) {
 
 // ------------------------------------------------------------------ main
 if (process.argv[2] === "--guard") {
-  guard(function (changed) { console.log(changed.length ? "Changed: " + changed.join(", ") : "Nothing to change."); process.exit(0); });
-} else {
+  probe(function () {
+    guard(function (changed) { console.log(changed.length ? "Changed: " + changed.join(", ") : "Nothing to change."); process.exit(0); });
+  });
+} else probe(function () {
   log("agent start: app=" + APP + " home=" + HOME_APPS.join("|") + " key=" + (HOME_CODE || "none") +
       " boot=" + BOOT_TO_TILES + " guard=" + GUARD_HOURS + "h");
   saveStatus();
@@ -204,4 +233,4 @@ if (process.argv[2] === "--guard") {
   if (process.env.LGKIT_FIRST_BOOT !== "0") onPowerOn("boot");
   if (GUARD_HOURS > 0) setInterval(function () { guard(); }, GUARD_HOURS * 3600 * 1000);
   process.on("SIGTERM", function () { log("agent stop"); process.exit(0); });
-}
+});

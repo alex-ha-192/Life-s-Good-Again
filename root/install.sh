@@ -103,11 +103,42 @@ lgws_wait() { # wait for an LGWS background job
     done
     return 1
 }
+# one luna call that prints its reply even where luna-send only prints to a terminal (webOS 23)
+lsend() {
+    r=$(luna-send -n 1 -w 8000 "$1" "$2" </dev/null 2>/dev/null)
+    [ -z "$r" ] && command -v script >/dev/null 2>&1 && \
+        r=$(script -q -c "luna-send -n 1 -w 8000 $1 '$2'" /dev/null </dev/null 2>/dev/null | tr -d '\r')
+    printf '%s\n' "$r"
+}
+app_dir() { echo "/media/developer/apps/usr/palm/applications/$1"; }
+app_installed() {
+    [ -f "$(app_dir "$1")/appinfo.json" ] && return 0
+    lsend luna://com.webos.applicationManager/getAppInfo "{\"id\":\"$1\"}" | grep -q '"returnValue": *true'
+}
+# Install an .ipk the way Homebrew Channel does (appInstallService dev/install, kept subscribed),
+# then confirm from the files, not from luna-send's output (which may be empty here).
+INSTALL_WHY=""
+install_ipk() { # $1 = ipk path on the TV, $2 = app id
+    start=$(date +%s); f="$(app_dir "$2")/appinfo.json"
+    luna-send -i luna://com.webos.appInstallService/dev/install \
+        "{\"id\":\"$2\",\"ipkUrl\":\"$1\",\"subscribe\":true}" </dev/null >/tmp/lgkit.install.out 2>&1 &
+    lp=$!
+    i=0
+    while [ $i -lt 60 ]; do
+        if [ -f "$f" ] && [ "$(stat -c %Z "$f" 2>/dev/null || echo 0)" -ge "$start" ]; then sleep 2; break; fi
+        grep -q '"statusValue": *30\|"state": *"installed"' /tmp/lgkit.install.out 2>/dev/null && break
+        if grep -q '"returnValue": *false\|"state": *"failed"' /tmp/lgkit.install.out 2>/dev/null; then
+            INSTALL_WHY=$(tr -d '\n' </tmp/lgkit.install.out | sed -n 's/.*"errorText": *"\([^"]*\)".*/\1/p'); break
+        fi
+        i=$((i + 1)); sleep 2
+    done
+    kill "$lp" 2>/dev/null
+    if [ -f "$f" ] && [ "$(stat -c %Z "$f" 2>/dev/null || echo 0)" -ge "$start" ]; then return 0; fi
+    [ -n "$INSTALL_WHY" ] || INSTALL_WHY="no new files after 2 minutes$( [ -s /tmp/lgkit.install.out ] && echo "; it said: $(head -c 200 /tmp/lgkit.install.out | tr -d '\n')")"
+    return 1
+}
 install_ipk_lgws() { # $1 = ipk path on the TV
-    luna-send -n 1 -w 60000 luna://com.webos.appInstallService/dev/install \
-        "{\"id\":\"$LGWS_ID\",\"ipkUrl\":\"$1\",\"subscribe\":true}" >/dev/null 2>&1
-    i=0; while [ $i -lt 30 ] && [ ! -f "$LGWS_CTL" ]; do i=$((i + 1)); sleep 2; done
-    [ -f "$LGWS_CTL" ] || { say "  ! the TV's installer didn't install LGWS"; return 1; }
+    install_ipk "$1" "$LGWS_ID" || { say "  ! the TV's installer didn't install LGWS ($INSTALL_WHY)"; return 1; }
     say "  LGWS: installed ($(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$LGWS_DIR/appinfo.json"))"
 }
 curl_why() { # explain a curl exit code
@@ -268,29 +299,65 @@ ln -sf "$D/lgkit-boot.sh" "$INITD/60-lgkit"
 say "  boot hook: $INITD/60-lgkit"
 
 # Tiles Home app
+APP_OK=skip
 if [ "$SKIP_APP" = 0 ]; then
-    ipk=$(ls -t "$SRC"/dist/*.ipk 2>/dev/null | head -n1)
+    ipk=$(ls -t "$SRC"/dist/io.github.lgprivacykit.tiles_*.ipk 2>/dev/null | head -n1)
     if [ -n "$ipk" ]; then
-        mkdir -p /media/developer/temp
-        cp "$ipk" /media/developer/temp/lgkit-tiles.ipk
-        r=$(luna-send -n 1 -w 30000 luna://com.webos.appInstallService/dev/install \
-            '{"id":"com.ares.defaultName","ipkUrl":"/media/developer/temp/lgkit-tiles.ipk","subscribe":true}' 2>&1)
-        case "$r" in
-            *'"returnValue":true'*|*'"returnValue": true'*) say "  Tiles Home: installed from $(basename "$ipk")" ;;
-            *) say "  ! Tiles Home install said: $r"; say "    Install the .ipk from Homebrew Channel or Dev Manager instead." ;;
-        esac
+        cp "$ipk" /media/developer/temp/lgkit-tiles.ipk 2>/dev/null || { mkdir -p /media/developer/temp; cp "$ipk" /media/developer/temp/lgkit-tiles.ipk; }
+        if install_ipk /media/developer/temp/lgkit-tiles.ipk "$APP"; then
+            APP_OK=yes; say "  Tiles Home: installed from $(basename "$ipk")"
+        else
+            APP_OK=no; say "  ! Tiles Home: the TV's installer didn't install it ($INSTALL_WHY)"
+        fi
+        rm -f /media/developer/temp/lgkit-tiles.ipk
     else
-        say "  Tiles Home: no .ipk in $SRC/dist, skipping (build it with tools/build_ipk.py)"
+        APP_OK=no; say "  ! Tiles Home: no .ipk in $SRC/dist (build it with tools/build_ipk.py)"
     fi
 fi
 
 # apply now: restart cleanly so new settings take effect
 stop_agent; flush_fw
-[ "$LGWS" = 1 ] || unmount_hosts
+[ "$LGWS" = 1 ] || { grep -q " /etc/hosts " /proc/mounts && say "  hosts: re-applying the kit's list"; unmount_hosts >/dev/null; }
+before=$(cat "$D/boot.log" 2>/dev/null | wc -l)
 LGKIT_FIRST_BOOT=1 sh "$D/lgkit-boot.sh"
-sleep 1
-tail -n 6 "$D/boot.log" | sed 's/^/  /'
+tail -n +$((before + 1)) "$D/boot.log" | grep -v '^==' | sed 's/^/  /'
+
+# ------------------------------------------------------------------ honest summary
 say ""
+say "Result:"
+PROBLEMS=0
+ok()   { say "  OK      $*"; }
+bad()  { say "  FAILED  $*"; PROBLEMS=$((PROBLEMS + 1)); }
+warn() { say "  NOTE    $*"; }
+case "$APP_OK" in
+    yes) ok "Tiles Home installed" ;;
+    skip) app_installed "$APP" && ok "Tiles Home already installed (not updated: --skip-app)" || bad "Tiles Home isn't installed (--skip-app)" ;;
+    *) bad "Tiles Home isn't installed. Install dist/$(basename "${ipk:-io.github.lgprivacykit.tiles_1.0.0_all.ipk}") with Homebrew Channel's or Dev Manager's installer, then press Home." ;;
+esac
+n=$(grep -c '^0\.0\.0\.0' /etc/hosts 2>/dev/null)
+if [ "$LGWS" = 1 ]; then
+    grep -qF "# lifesgoodwithoutspying" /etc/hosts && ok "Life's Good Without Spying list active" || bad "Life's Good Without Spying's list isn't in /etc/hosts (see: sh $LGWS_CTL joblog)"
+    warn "kit extras are added after LGWS's list in the background (check with --status in a minute)"
+else
+    [ "${n:-0}" -gt 100 ] && ok "blocklist active: $n names in /etc/hosts" || bad "blocklist not active (/etc/hosts has ${n:-0} blocked names)"
+fi
+if [ "$FIREWALL" = 1 ]; then
+    v4=$(iptables -S LGKIT 2>/dev/null | grep -c -- '-j \(REJECT\|DROP\)'); v6=$(ip6tables -S LGKIT 2>/dev/null | grep -c -- '-j \(REJECT\|DROP\)')
+    [ "${v4:-0}" -gt 0 ] && ok "firewall IPv4: $v4 rules" || bad "firewall IPv4: no rules (no iptables on this TV?)"
+    [ "${v6:-0}" -gt 0 ] && ok "firewall IPv6: $v6 rules" || warn "firewall IPv6: not available on this TV"
+fi
+i=0; while [ $i -lt 20 ] && ! pgrep -f lgkit-agent.js >/dev/null 2>&1; do i=$((i + 1)); sleep 1; done
+if pgrep -f lgkit-agent.js >/dev/null 2>&1; then
+    sleep 3; ok "agent running (Home button, power-on, settings guard)$(sed -n 's/.*"luna": *"\([^"]*\)".*/; luna-send: \1/p' "$D/status.json" 2>/dev/null)"
+else
+    warn "agent still starting (it waits for the TV's app manager); check with --status in a minute"
+fi
+say ""
+if [ "$PROBLEMS" -gt 0 ]; then
+    say "! Finished with $PROBLEMS problem(s), listed above."
+    say "Status: sh $D/install.sh --status    Undo: sh $D/install.sh --uninstall"
+    exit 1
+fi
 say "Done. Press Home on the remote: Tiles Home should open."
 [ "${HOME_CODE:-0}" = 0 ] && say "Tip: run 'node $D/find-home-key.js', press Home, then re-run with --home-code N so the Home button is caught even faster."
 say "Status any time: sh $D/install.sh --status    Undo: sh $D/install.sh --uninstall"
