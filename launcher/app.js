@@ -41,6 +41,9 @@
   var HIDE = { "com.webos.app.connectionwizard": 1 };
   HIDE[SELF] = 1;
 
+  var CFG = { rooted: false };   // config.json, written by tools/build_ipk.py (--rooted)
+  var MOTION_KEY = "tileshome.motion";
+  function motionOn() { try { return localStorage.getItem(MOTION_KEY) === "on"; } catch (e) { return false; } }
   var st = { apps: [], pages: [], p: 0, sel: [0, 0, 0, 0, 0], favs: [], moving: false };
   var $ = function (id) { return document.getElementById(id); };
 
@@ -121,6 +124,7 @@
       { id: "com.palmdts.devmode", title: "Developer Mode", glyph: "code", color: "#39414b" },
       { id: "com.webos.app.home", title: "LG Home", glyph: "home", color: "#39414b" },
       { action: "extend", id: "tiles:extend", title: devTitle(), glyph: "renew", color: "#39414b" },
+      { action: "motion", id: "tiles:motion", title: motionOn() ? "Animations: on" : "Animations: off", glyph: "renew", color: "#39414b" },
       { action: "reset", id: "tiles:reset", title: "Reset favourites", glyph: "reset", color: "#39414b" }
     ].filter(function (x) { return hasDevMode() || (x.id !== "com.palmdts.devmode" && x.action !== "extend"); });
     var all = {};
@@ -145,15 +149,17 @@
     var days = Math.floor((Date.now() - t) / 86400000);
     return "Dev Mode extended " + (days < 1 ? "today" : days === 1 ? "yesterday" : days + " days ago");
   }
-  var extending = false;
+  var extending = false, devAbsent = false;
   function extendDevMode(manual) {
     if (extending) return;
     extending = true;
-    toast(manual ? "Extending Developer Mode\u2026" : "Keeping Developer Mode active\u2026");
+    if (manual) toast("Extending Developer Mode\u2026");
     luna("luna://com.webos.applicationManager/launch", { id: "com.palmdts.devmode", params: { extend: true } }, function (r) {
       if (r && r.returnValue === false) {
         extending = false;
-        toast("Couldn't reach Developer Mode" + (r.errorText ? ": " + r.errorText : ""));
+        // not installed (e.g. removed on a rooted TV): stop trying, and say nothing unless asked
+        if (/not ?exist|not found|no such/i.test(r.errorText || "")) { devAbsent = true; buildPages(); render(); }
+        if (manual) toast("Couldn't reach Developer Mode" + (r.errorText ? ": " + r.errorText : ""));
         return;
       }
       try { localStorage.setItem(DEV_KEY, String(Date.now())); } catch (e) {}
@@ -167,7 +173,8 @@
   }
   // On a rooted TV you may have removed the Developer Mode app; then there's nothing to extend.
   function hasDevMode() {
-    return !st.lpOk || st.apps.some(function (a) { return a.id === "com.palmdts.devmode"; });
+    if (CFG.rooted || devAbsent) return false;
+    return st.apps.some(function (a) { return a.id === "com.palmdts.devmode"; });
   }
   function maybeExtend() {
     if (!hasDevMode()) return;
@@ -207,7 +214,7 @@
     if (d > n / 2) d -= n;                       // -2..2
     var s = SLOTS[d], el = cols[p];
     // wrapping from one end of the ring to the other: jump, don't sweep across the screen
-    var jump = lastD[p] !== undefined && Math.abs(d - lastD[p]) > 2;
+    var jump = document.body.classList.contains("motion") && lastD[p] !== undefined && Math.abs(d - lastD[p]) > 2;
     if (jump) el.classList.add("jump");
     el.className = "col" + (d < 0 ? " mir" : "") + (d === 0 ? " on" : "") + (jump ? " jump" : "");
     el.setAttribute("data-d", d);
@@ -228,7 +235,6 @@
         ring.appendChild(el); cols.push(el);
       });
     }
-    var turned = lastP !== st.p;
     st.pages.forEach(function (pg, p) {
       var d = placeCol(p), active = d === 0, el = cols[p];
       el.firstChild.textContent = pg.h;
@@ -246,17 +252,7 @@
           rows[i].classList.toggle("mv", on && st.moving);
         }
       }
-      // Metro "arrive": the page that lands in the middle brings its rows in one after another
-      if (active && (turned || firstPaint)) {
-        var rs = body.querySelectorAll(".r, .empty, .more");
-        for (var k = 0; k < rs.length; k++) {
-          rs[k].classList.remove("in"); void rs[k].offsetWidth;
-          rs[k].style.animationDelay = (k * 28) + "ms";
-          rs[k].classList.add("in");
-        }
-      }
     });
-    if (firstPaint) { ring.classList.remove("boot"); void ring.offsetWidth; ring.classList.add("boot"); }
     firstPaint = false; lastP = st.p;
     hints();
   }
@@ -288,9 +284,12 @@
   function current() { return st.pages[st.p].items[st.sel[st.p]]; }
   function open(it) {
     if (!it) return;
-    var row = document.querySelector(".col[data-d='0'] .r.f");
-    if (row) { row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
     if (it.action === "extend") return extendDevMode(true);
+    if (it.action === "motion") {
+      try { localStorage.setItem(MOTION_KEY, motionOn() ? "off" : "on"); } catch (e) {}
+      document.body.classList.toggle("motion", motionOn());
+      buildPages(); render(); return;
+    }
     if (it.action === "reset") {
       try { localStorage.removeItem(FAV_KEY); } catch (e) {}
       return loadFavs(function () { buildPages(); render(); toast("Favourites reset"); });
@@ -379,5 +378,7 @@
   });
 
   tick();
-  loadFavs(function () { loadApps(function () { buildPages(); render(); setTimeout(maybeExtend, 1500); }); });
+  document.body.classList.toggle("motion", motionOn());
+  getJSON("config.json", function (c) { if (c) CFG = c; start(); });
+  function start() { loadFavs(function () { loadApps(function () { buildPages(); render(); setTimeout(maybeExtend, 1500); }); }); }
 })();

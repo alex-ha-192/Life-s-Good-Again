@@ -79,6 +79,8 @@ def ar(entries):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--icons", action="store_true", help="redraw icon.png and largeIcon.png")
+    ap.add_argument("--rooted", action="store_true",
+                    help="for a rooted TV: Tiles Home never touches Developer Mode (no rows, no extending)")
     args = ap.parse_args()
 
     if args.icons or not (APP / "icon.png").exists():
@@ -92,6 +94,8 @@ def main():
     for p in sorted(APP.rglob("*")):
         if p.is_file() and not p.name.startswith("."):
             files.append((f"usr/palm/applications/{app_id}/{p.relative_to(APP).as_posix()}", p.read_bytes()))
+    files = [f for f in files if not f[0].endswith("/config.json")]
+    files.append((f"usr/palm/applications/{app_id}/config.json", json.dumps({"rooted": args.rooted}).encode()))
     pkginfo = {"app": app_id, "id": app_id, "loc_name": info["title"],
                "package_format_version": 2, "vendor": info.get("vendor", ""), "version": version}
     files.append((f"usr/palm/packages/{app_id}/packageinfo.json", json.dumps(pkginfo, indent=1).encode()))

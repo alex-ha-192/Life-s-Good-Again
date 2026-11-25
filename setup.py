@@ -353,7 +353,7 @@ def step_launcher(c):
         return
     say("  Snapshotting your installed apps and icons…")
     core.cmd_export_tiles(argparse.Namespace(host=c.st["tv"], insecure_port=c.a.insecure_port, no_icons=False))
-    rc, out, err = run([PY, str(HERE / "tools" / "build_ipk.py")])
+    rc, out, err = run([PY, str(HERE / "tools" / "build_ipk.py")] + (["--rooted"] if c.a.root else []))
     ipks = sorted((HERE / "dist").glob("*.ipk"), key=lambda p: p.stat().st_mtime)
     if rc or not ipks:
         c.fail("launcher", f"Building the .ipk failed: {err.strip() or out.strip()}")
@@ -543,8 +543,7 @@ def step_root(c):
     if not shutil.which("ssh"):
         c.fail("root", "No ssh command on this computer. Use the by-hand steps in GUIDE.html (Rooted TV).")
         return
-    if not sorted((HERE / "dist").glob("io.github.lgprivacykit.tiles_*.ipk")):
-        run([PY, str(HERE / "tools" / "build_ipk.py")])
+    run([PY, str(HERE / "tools" / "build_ipk.py"), "--rooted"])   # rooted build: no Developer Mode in Tiles Home
     if not c.a.no_lgws and not c.a.dry_run:
         say("  Life's Good Without Spying: fetching it here so the TV doesn't have to")
         if not fetch_lgws(c):
