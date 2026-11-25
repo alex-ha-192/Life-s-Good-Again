@@ -360,10 +360,16 @@
   // Held keys repeat faster than a slow TV can paint: apply every press to the state at once,
   // but draw at most once per frame, so presses never queue up behind drawing.
   var pending = false, raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+  // First press: draw right now, inside the key event, so it makes the very next frame instead of
+  // waiting one for requestAnimationFrame. Further presses in the same frame (a held key) are folded
+  // into one draw at the next frame.
+  var drewT = -1e9;
   function schedule() {
     if (pending) return;
+    var now = performance.now();
+    if (now - drewT > 16) { drewT = now; render(); speedFrame(); return; }
     pending = true;
-    raf(function () { pending = false; render(); speedFrame(); });
+    raf(function () { pending = false; drewT = performance.now(); render(); speedFrame(); });
   }
   document.addEventListener("keydown", function (e) {
     if (speedOn) speedKey();
