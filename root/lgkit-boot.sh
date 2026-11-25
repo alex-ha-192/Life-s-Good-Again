@@ -1,9 +1,10 @@
 #!/bin/sh
 # LG TV Privacy Kit - boot hook. ROOTED TVs ONLY (Homebrew Channel with root).
-# install.sh links this as /var/lib/webosbrew/init.d/50-lgkit, so Homebrew Channel runs it at
-# every boot. It finishes in about a second (Homebrew's failsafe watches boot scripts) and:
-#   1. hosts: bind-mounts /etc/hosts with the kit's blocklist added. Nothing is written to the
-#      read-only system partition; a reboot without this hook gives you the stock file back.
+# install.sh links this as /var/lib/webosbrew/init.d/60-lgkit, so Homebrew Channel runs it at
+# every boot, after Life's Good Without Spying's own hook (50-...). It finishes in about a second
+# (Homebrew's failsafe watches boot scripts) and:
+#   1. hosts: adds the kit's extra names after LGWS's blocklist (or, without LGWS, bind-mounts
+#      /etc/hosts with the kit's whole list). Nothing is written to the system partition.
 #   2. firewall: stops the TV reaching public DNS resolvers directly (port 53 or DoH) and
 #      DNS-over-TLS (853), so apps can't go around the hosts list. Only if iptables exists.
 #   3. starts lgkit-agent.js (Home -> Tiles Home, power-on, settings guard) in the background.
@@ -15,19 +16,41 @@ echo "== $(date) lgkit boot"
 [ -f "$D/lgkit.env" ] && . "$D/lgkit.env"
 
 # --- 1. hosts --------------------------------------------------------------------------------
-if [ "${HOSTS:-1}" = 1 ] && [ -s "$D/hosts.block" ]; then
-    bad=$(grep -v -E '^(#.*|[[:space:]]*|0\.0\.0\.0[[:space:]]+[A-Za-z0-9._-]+)$' "$D/hosts.block" | head -n1)
-    if [ -n "$bad" ]; then
-        echo "hosts: unexpected line, not applying: $bad"
+# With Life's Good Without Spying (LGWS, the default): LGWS owns /etc/hosts. Once its blocklist is
+# up, we append the kit's extra names (regional ad hosts, DoH services, strict tier) after it.
+# LGWS keeps lines other tools add after its block, so they survive its own re-applies.
+# Without LGWS (--no-lgws): bind-mount /etc/hosts with the kit's whole list, as before.
+LGWS_MARK="# lifesgoodwithoutspying - blocked LG ad/ACR/telemetry endpoints"
+KIT_MARK="# --- LG TV Privacy Kit extras"
+append_extras() {
+    grep -qF "$KIT_MARK" /etc/hosts && { echo "hosts: kit extras already there"; return; }
+    { echo "$KIT_MARK ($(grep -c '^0' "$D/hosts.extra") names, $D/hosts.extra) ---"; cat "$D/hosts.extra";
+      echo "# --- end LG TV Privacy Kit ---"; } >>/etc/hosts && echo "hosts: added $(grep -c '^0' "$D/hosts.extra") kit extras after LGWS"
+}
+valid() { ! grep -v -E '^(#.*|[[:space:]]*|0\.0\.0\.0[[:space:]]+[A-Za-z0-9._-]+)$' "$1" | grep -q .; }
+if [ "${LGWS:-0}" = 1 ]; then
+    if [ -s "$D/hosts.extra" ] && valid "$D/hosts.extra"; then
+        (   # in the background: LGWS applies at boot too, and may take a minute or two
+            i=0
+            while [ $i -lt 100 ]; do
+                grep -qF "$LGWS_MARK" /etc/hosts 2>/dev/null && { sleep 3; append_extras; exit 0; }
+                i=$((i + 1)); sleep 3
+            done
+            echo "hosts: LGWS blocklist never came up; kit extras not added (is its protection on?)"
+        ) >>"$D/boot.log" 2>&1 &
+        echo "hosts: waiting for LGWS, then adding kit extras"
+    fi
+elif [ "${HOSTS:-1}" = 1 ] && [ -s "$D/hosts.block" ]; then
+    if ! valid "$D/hosts.block"; then
+        echo "hosts: unexpected line in hosts.block, not applying"
     elif grep -q " /etc/hosts " /proc/mounts; then
-        echo "hosts: /etc/hosts already bind-mounted, leaving it"
+        echo "hosts: /etc/hosts already bind-mounted by something else, leaving it"
     else
         M=/tmp/lgkit.hosts
         { cat /etc/hosts; echo; echo "# --- LG TV Privacy Kit ($D/hosts.block) ---"; cat "$D/hosts.block"; } >"$M"
         chmod 644 "$M"
         if mount --bind "$M" /etc/hosts; then
             echo "hosts: $(grep -c '^0\.0\.0\.0' "$D/hosts.block") names blocked"
-            # make running resolvers re-read it
             killall -HUP dnsmasq 2>/dev/null
         else
             echo "hosts: bind mount failed"

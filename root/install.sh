@@ -5,15 +5,24 @@
 # By hand, over SSH on the TV:    sh /tmp/kit/root/install.sh --from /tmp/kit [options]
 #
 # What it sets up (all reversible, nothing on the read-only system partition):
-#   - Tiles Home installed, opened by the Home button, at power-on and after standby
-#   - the kit's blocklist in the TV's own hosts file (no Pi-hole needed)
+#   - Life's Good Without Spying (LGWS, a Homebrew Channel app by lewisdoesstuff) as the
+#     telemetry layer: it blocks LG's ad/ACR/telemetry hosts and stops LG's ad, ACR, telemetry
+#     and voice services. Installed from its GitHub release if missing (SHA-256 checked),
+#     then configured and switched on through its own nospy-ctl.sh.
+#   - the kit's extra names on top of LGWS's list (regional ad hosts, DoH services)
 #   - a firewall so apps can't go around it (public resolvers, DoH by IP, DNS-over-TLS)
+#   - Tiles Home, opened by the Home button, at power-on and after standby
 #   - the privacy settings re-checked on the TV every 6 hours and after every power-on
 #
 # Options:
 #   --from DIR          the unpacked kit (default: the folder above this script)
-#   --tiers LIST        blocklist tiers, comma list of base,strict,doh (default: base,doh; strict also stops the Content Store)
-#   --block-updates     also block LG firmware updates (keeps root; you miss LG's security fixes)
+#   --tiers LIST        kit tiers, comma list of base,strict,doh (default: base,doh). strict also turns
+#                       on LGWS's Content Store, Home sessions, ThinQ and LG Channels categories
+#   --keep-store        keep the LG Content Store working (LGWS: SDP not blocked)
+#   --keep-voice        keep LG's voice services (LGWS stops them by default; the remote's mic
+#                       button stops working while they're stopped)
+#   --block-updates     also block LG firmware and app updates (keeps root; you miss security fixes)
+#   --no-lgws           don't use LGWS: put the kit's own whole list in /etc/hosts instead
 #   --home-code N       your remote's Home key code (find it with: node find-home-key.js)
 #   --no-firewall       skip the firewall rules
 #   --no-boot-to-tiles  don't open Tiles Home at power-on (the Home button still does)
@@ -21,14 +30,20 @@
 #   --guard-hours N     how often to re-check settings (default 6, 0 = only after power-on)
 #   --skip-app          don't install/update the Tiles Home app
 #   --status            show what's active
-#   --uninstall         remove all of it (Tiles Home itself stays; remove it from the app list)
+#   --uninstall         remove all of it, and switch LGWS off again if this kit switched it on
+#                       (Tiles Home and the LGWS app stay installed; remove them from the app list)
 set -u
 D=/var/lib/webosbrew/lgkit
 INITD=/var/lib/webosbrew/init.d
 APP=io.github.lgprivacykit.tiles
 SRC=$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)
 TIERS=base,doh; BLOCK_UPDATES=0; HOME_CODE=""; FIREWALL=1; BOOT_TO_TILES=1; REDIRECT_HOME=1
-GUARD_HOURS=6; SKIP_APP=0; MODE=install
+GUARD_HOURS=6; SKIP_APP=0; MODE=install; LGWS=1; KEEP_STORE=0; KEEP_VOICE=0
+LGWS_ID=ooo.lew.lifesgoodwithoutspying
+LGWS_DIR=/media/developer/apps/usr/palm/applications/$LGWS_ID
+LGWS_CTL=$LGWS_DIR/init/nospy-ctl.sh
+LGWS_MANIFEST=https://github.com/lewisdoesstuff/lifesgoodwithoutspying/releases/latest/download/$LGWS_ID.manifest.json
+KIT_MARK="# --- LG TV Privacy Kit extras"
 
 die() { echo "! $*" >&2; exit 1; }
 say() { echo "$*"; }
@@ -38,6 +53,9 @@ while [ $# -gt 0 ]; do
         --from) SRC=$2; shift ;;
         --tiers) TIERS=$2; shift ;;
         --block-updates) BLOCK_UPDATES=1 ;;
+        --keep-store) KEEP_STORE=1 ;;
+        --keep-voice) KEEP_VOICE=1 ;;
+        --no-lgws) LGWS=0 ;;
         --home-code) HOME_CODE=$2; shift ;;
         --no-firewall) FIREWALL=0 ;;
         --no-boot-to-tiles) BOOT_TO_TILES=0 ;;
@@ -46,7 +64,7 @@ while [ $# -gt 0 ]; do
         --skip-app) SKIP_APP=1 ;;
         --status) MODE=status ;;
         --uninstall) MODE=uninstall ;;
-        -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,38p' "$0"; exit 0 ;;
         *) die "unknown option $1 (try --help)" ;;
     esac
     shift
@@ -70,6 +88,38 @@ flush_fw() {
         $T -F LGKIT 2>/dev/null; $T -X LGKIT 2>/dev/null
     done
 }
+remove_extras() { # take the kit's block back out of /etc/hosts, in place (it may be a bind mount)
+    grep -qF "$KIT_MARK" /etc/hosts 2>/dev/null || return 0
+    awk -v m="$KIT_MARK" 'index($0, m) == 1 { skip = 1; next } skip && /^# --- end LG TV Privacy Kit ---/ { skip = 0; next } !skip' \
+        /etc/hosts >/tmp/lgkit.hosts.new && cat /tmp/lgkit.hosts.new >/etc/hosts && rm -f /tmp/lgkit.hosts.new
+    say "  hosts: kit extras removed"
+}
+lgws_wait() { # wait for an LGWS background job
+    i=0
+    while [ $i -lt 130 ]; do
+        st=$(sh "$LGWS_CTL" job 2>/dev/null | sed -n 's/^job=//p' | head -n1)
+        case "$st" in done|idle) return 0 ;; failed) return 1 ;; esac
+        i=$((i + 1)); sleep 2
+    done
+    return 1
+}
+install_lgws() {
+    say "  LGWS: not installed; fetching the latest release from GitHub"
+    command -v curl >/dev/null 2>&1 || { say "  ! no curl on this TV"; return 1; }
+    m=$(curl -fsSL --max-time 30 "$LGWS_MANIFEST") || { say "  ! couldn't download the LGWS manifest"; return 1; }
+    url=$(printf '%s' "$m" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.ipkUrl)})')
+    sum=$(printf '%s' "$m" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log((j.ipkHash||{}).sha256||"")})')
+    case "$url" in https://github.com/lewisdoesstuff/lifesgoodwithoutspying/*) ;; *) say "  ! unexpected download address: $url"; return 1 ;; esac
+    mkdir -p /media/developer/temp
+    curl -fsSL --max-time 120 -o /media/developer/temp/lgws.ipk "$url" || { say "  ! download failed"; return 1; }
+    got=$(sha256sum /media/developer/temp/lgws.ipk | cut -d' ' -f1)
+    [ -n "$sum" ] && [ "$got" = "$sum" ] || { say "  ! checksum mismatch, not installing"; rm -f /media/developer/temp/lgws.ipk; return 1; }
+    luna-send -n 1 -w 60000 luna://com.webos.appInstallService/dev/install \
+        "{\"id\":\"$LGWS_ID\",\"ipkUrl\":\"/media/developer/temp/lgws.ipk\",\"subscribe\":true}" >/dev/null 2>&1
+    i=0; while [ $i -lt 30 ] && [ ! -f "$LGWS_CTL" ]; do i=$((i + 1)); sleep 2; done
+    rm -f /media/developer/temp/lgws.ipk
+    [ -f "$LGWS_CTL" ] && say "  LGWS: installed ($(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$LGWS_DIR/appinfo.json"))"
+}
 remove_old_v1() {
     # v1 of the kit shipped these optional hooks; the agent replaces them
     rm -f "$INITD/50-tiles-home" "$INITD/51-tiles-home-watch" /var/lib/webosbrew/tiles-home-watch.js \
@@ -77,11 +127,17 @@ remove_old_v1() {
 }
 
 if [ "$MODE" = status ]; then
-    say "Init hook:  $(ls -l "$INITD/50-lgkit" 2>/dev/null || echo 'not installed')"
+    say "Init hook:  $(ls -l "$INITD/60-lgkit" 2>/dev/null || echo 'not installed')"
     if grep -q " /etc/hosts " /proc/mounts; then say "Hosts:      blocking $(grep -c '^0\.0\.0\.0' /etc/hosts) names"; else say "Hosts:      stock"; fi
     if command -v iptables >/dev/null 2>&1 && iptables -S LGKIT >/dev/null 2>&1; then
         say "Firewall:   $(iptables -S LGKIT | grep -c REJECT) IPv4 rules"; else say "Firewall:   off"; fi
     say "Agent:      $(pgrep -f lgkit-agent.js >/dev/null 2>&1 && echo running || echo 'not running')"
+    say "Kit extras: $(grep -qF "$KIT_MARK" /etc/hosts && echo "in /etc/hosts ($(grep -c '^0' "$D/hosts.extra" 2>/dev/null) names)" || echo 'not in /etc/hosts')"
+    if [ -f "$LGWS_CTL" ]; then
+        say "LGWS:       $(sh "$LGWS_CTL" status 2>/dev/null | grep -E '^(autostart|job|hosts|blocklist|stubs)=' | tr '\n' ' ')"
+    else
+        say "LGWS:       not installed"
+    fi
     [ -f "$D/status.json" ] && cat "$D/status.json" && echo
     [ -f "$D/agent.log" ] && { say "Last log lines:"; tail -n 8 "$D/agent.log"; }
     exit 0
@@ -89,9 +145,15 @@ fi
 
 if [ "$MODE" = uninstall ]; then
     say "Removing the LG TV Privacy Kit from this TV"
-    rm -f "$INITD/50-lgkit"; remove_old_v1
+    rm -f "$INITD/60-lgkit" "$INITD/50-lgkit"; remove_old_v1
     stop_agent; say "  agent: stopped"
-    unmount_hosts
+    remove_extras
+    if grep -q '^LGWS_BY_KIT=1' "$D/lgkit.env" 2>/dev/null && [ -f "$LGWS_CTL" ]; then
+        sh "$LGWS_CTL" disable >/dev/null && lgws_wait && say "  LGWS: protection switched off (the kit had switched it on)"
+    elif [ -f "$LGWS_CTL" ]; then
+        say "  LGWS: left on (it was on before the kit). Switch it off in its app if you want."
+    fi
+    grep -q '^LGWS=1' "$D/lgkit.env" 2>/dev/null || unmount_hosts
     flush_fw; say "  firewall: removed"
     rm -rf "$D"
     say "Done. Tiles Home is still installed: remove it from the app list if you don't want it."
@@ -105,6 +167,30 @@ command -v node >/dev/null 2>&1 || die "no node on this TV; the agent needs it"
 say "Installing the LG TV Privacy Kit (rooted) from $SRC"
 mkdir -p "$D" "$INITD" || die "can't create $D"
 
+# Life's Good Without Spying: the telemetry layer
+LGWS_BY_KIT=$(sed -n 's/^LGWS_BY_KIT=//p' "$D/lgkit.env" 2>/dev/null); LGWS_BY_KIT=${LGWS_BY_KIT:-0}
+if [ "$LGWS" = 1 ]; then
+    [ -f "$LGWS_CTL" ] || install_lgws || die "Life's Good Without Spying isn't installed and couldn't be fetched. Install it from Homebrew Channel, then run this again (or use --no-lgws)."
+    # an older kit's own hosts mount would stop LGWS mounting its list
+    grep -q " /etc/hosts " /proc/mounts && ! grep -qF "# lifesgoodwithoutspying" /etc/hosts && unmount_hosts
+    on() { sh "$LGWS_CTL" set "$1" "$2" >/dev/null || say "  ! LGWS didn't take $1=$2"; }
+    strict=0; case ",$TIERS," in *,strict,*) strict=1 ;; esac
+    for k in domains.smartad domains.acr domains.dashboard domains.telemetry ads.stop purge.boot; do on $k on; done
+    on domains.sdp "$([ "$KEEP_STORE" = 1 ] && echo off || echo on)"
+    on voice.stop "$([ "$KEEP_VOICE" = 1 ] && echo off || echo on)"
+    for k in domains.lgrecommends domains.wiselg domains.thinq domains.lgchannels; do on $k "$([ $strict = 1 ] && echo on || echo off)"; done
+    on domains.updates "$([ "$BLOCK_UPDATES" = 1 ] && echo on || echo off)"
+    remove_extras   # LGWS rebuilds its list now; the kit adds its extras again afterwards
+    if sh "$LGWS_CTL" status 2>/dev/null | grep -q '^autostart=on'; then
+        sh "$LGWS_CTL" apply >/dev/null
+    else
+        sh "$LGWS_CTL" enable >/dev/null && LGWS_BY_KIT=1
+    fi
+    say "  LGWS: applying (up to a few minutes)…"
+    lgws_wait && say "  LGWS: $(sh "$LGWS_CTL" status 2>/dev/null | grep -E '^(hosts|blocklist|stubs)=' | tr '\n' ' ')" \
+        || say "  ! LGWS reported a problem: sh $LGWS_CTL joblog"
+    fi
+
 # blocklist
 tmp=$D/hosts.block.new
 : >"$tmp"
@@ -115,7 +201,15 @@ for t in $(echo "$TIERS" | tr ',' ' '); do
 done
 [ "$BLOCK_UPDATES" = 1 ] && grep -E '^0\.0\.0\.0[[:space:]]' "$SRC/blocklist/lg-firmware-updates.hosts" >>"$tmp"
 sort -u "$tmp" >"$D/hosts.block" && rm -f "$tmp"
-say "  blocklist: $(wc -l <"$D/hosts.block") names (tiers: $TIERS$([ "$BLOCK_UPDATES" = 1 ] && echo ', firmware updates'))"
+if [ "$LGWS" = 1 ]; then
+    # only what LGWS's own list doesn't already cover
+    cat "$LGWS_DIR"/init/blocklist.d/*.txt 2>/dev/null | grep -v '^[[:space:]]*#' | awk 'NF{print $1}' | sort -u >/tmp/lgkit.lgws
+    awk 'NR==FNR { have[$1] = 1; next } !($2 in have)' /tmp/lgkit.lgws "$D/hosts.block" >"$D/hosts.extra"
+    rm -f /tmp/lgkit.lgws
+    say "  kit extras: $(wc -l <"$D/hosts.extra") names on top of LGWS (tiers: $TIERS)"
+else
+    say "  blocklist: $(wc -l <"$D/hosts.block") names (tiers: $TIERS$([ "$BLOCK_UPDATES" = 1 ] && echo ', firmware updates'))"
+fi
 
 # agent, boot hook, settings
 cp "$SRC/root/lgkit-agent.js" "$SRC/root/lgkit-boot.sh" "$SRC/root/find-home-key.js" "$SRC/root/install.sh" "$D/" || die "copy failed"
@@ -125,7 +219,9 @@ if [ -z "$HOME_CODE" ] && [ -f "$D/lgkit.env" ]; then HOME_CODE=$(sed -n 's/^HOM
 cat >"$D/lgkit.env" <<EOF
 # written by install.sh; edit and reboot (or re-run install.sh) to change
 TILES_APP=$APP
-HOSTS=1
+LGWS=$LGWS
+LGWS_BY_KIT=$LGWS_BY_KIT
+HOSTS=$([ "$LGWS" = 1 ] && echo 0 || echo 1)
 FIREWALL=$FIREWALL
 BOOT_TO_TILES=$BOOT_TO_TILES
 REDIRECT_HOME=$REDIRECT_HOME
@@ -134,8 +230,9 @@ HOME_CODE=${HOME_CODE:-0}
 EOF
 
 remove_old_v1
-ln -sf "$D/lgkit-boot.sh" "$INITD/50-lgkit"
-say "  boot hook: $INITD/50-lgkit"
+rm -f "$INITD/50-lgkit"
+ln -sf "$D/lgkit-boot.sh" "$INITD/60-lgkit"
+say "  boot hook: $INITD/60-lgkit"
 
 # Tiles Home app
 if [ "$SKIP_APP" = 0 ]; then
@@ -155,7 +252,8 @@ if [ "$SKIP_APP" = 0 ]; then
 fi
 
 # apply now: restart cleanly so new settings take effect
-stop_agent; unmount_hosts; flush_fw
+stop_agent; flush_fw
+[ "$LGWS" = 1 ] || unmount_hosts
 LGKIT_FIRST_BOOT=1 sh "$D/lgkit-boot.sh"
 sleep 1
 tail -n 6 "$D/boot.log" | sed 's/^/  /'

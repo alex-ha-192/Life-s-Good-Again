@@ -15,8 +15,9 @@ Steps (each can be skipped with --skip NAME or picked with --only NAME,NAME):
   devmode   check Developer Mode, store its session token if possible, extend it now
   launcher  snapshot your apps, build Tiles Home, install it, open it
   root      ROOTED TVs only (--root): copy the kit to the TV over Homebrew Channel's SSH and
-            run root/install.sh there: Home button and power-on open Tiles Home, blocklist in
-            the TV's own hosts file, firewall, settings guard on the TV. No computer needed after.
+            run root/install.sh there: Life's Good Without Spying as the telemetry layer (plus the
+            kit's extra names), firewall, Home button and power-on open Tiles Home, settings guard
+            on the TV. No computer needed after.
   dns       add the blocklists to Pi-hole v6 or AdGuard Home over their APIs, then test
   router    write your router's anti-bypass rules with your TV's IP and MAC filled in
   schedule  add one timer: extend Developer Mode when due + re-check privacy settings
@@ -480,11 +481,16 @@ def step_root(c):
     args = ["--from", "/tmp/lgkit-src", "--tiers", tiers]
     if c.a.block_updates:
         args.append("--block-updates")
+    for flag in ("keep_store", "keep_voice", "no_lgws"):
+        if getattr(c.a, flag):
+            args.append("--" + flag.replace("_", "-"))
     if c.a.home_code:
         args += ["--home-code", str(c.a.home_code)]
     say(f"  Sends {bundle.name} ({bundle.stat().st_size // 1024} KB) to root@{c.st['tv']}:{c.a.root_port} and runs")
     say(f"  root/install.sh {' '.join(args)}")
-    say("  Blocks: " + tiers + (" + LG firmware updates" if c.a.block_updates else "")
+    say(("  Uses Life's Good Without Spying (installed if missing) to block LG's ad/ACR/telemetry hosts and"
+         " stop those services, plus the kit's extra names: " if not c.a.no_lgws else "  Blocks: ") + tiers
+        + (" + LG firmware updates" if c.a.block_updates else "")
         + ". The firewall stops apps reaching public DNS directly. Undo: `python3 setup.py undo`.")
     if c.a.dry_run:
         c.skip("root", "Would install it on the TV.")
@@ -927,6 +933,10 @@ def main():
                         "which also stops the Content Store and app updates)")
     p.add_argument("--block-updates", action="store_true",
                    help="rooted: also block LG firmware updates (keeps root; you miss LG's security fixes)")
+    p.add_argument("--keep-store", action="store_true", help="rooted: keep the LG Content Store working")
+    p.add_argument("--keep-voice", action="store_true", help="rooted: keep LG's voice services (and the mic button)")
+    p.add_argument("--no-lgws", action="store_true",
+                   help="rooted: don't use Life's Good Without Spying; the kit's own hosts list instead")
     p.add_argument("--home-code", type=int, help="rooted: your remote's Home key code (root/find-home-key.js)")
     p.add_argument("--press-enter", action="store_true", help="newer firmware: confirm the hidden alert")
     p.add_argument("--insecure-port", action="store_true", help=argparse.SUPPRESS)
