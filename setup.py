@@ -14,12 +14,16 @@ Steps (each can be skipped with --skip NAME or picked with --only NAME,NAME):
   consents  open TV Settings and walk you through the on-screen-only switches
   devmode   check Developer Mode, store its session token if possible, extend it now
   launcher  snapshot your apps, build Tiles Home, install it, open it
+  root      ROOTED TVs only (--root): copy the kit to the TV over Homebrew Channel's SSH and
+            run root/install.sh there: Home button and power-on open Tiles Home, blocklist in
+            the TV's own hosts file, firewall, settings guard on the TV. No computer needed after.
   dns       add the blocklists to Pi-hole v6 or AdGuard Home over their APIs, then test
   router    write your router's anti-bypass rules with your TV's IP and MAC filled in
   schedule  add one timer: extend Developer Mode when due + re-check privacy settings
   report    write an HTML summary to ~/.config/lgtv-privacy/setup-report.html
 
-Nothing on the TV's firmware or system files is touched. Every change is either
+Rooted TVs: `python3 setup.py --root` (one run from any laptop; nothing has to stay on after).
+Without --root, nothing on the TV's firmware or system files is touched. Every change is either
 an LG setting (backed up first), a Developer Mode app install, or something on
 your own computer / Pi-hole / AdGuard that `undo` removes again.
 Stdlib only (Python 3.8+).
@@ -49,7 +53,7 @@ import lgtv_privacy as core  # noqa: E402
 
 STATE_FILE = core.CONFIG_DIR / "setup.json"
 MARK = "lgtv-privacy-kit"
-STEPS = ["pair", "privacy", "consents", "devmode", "launcher", "dns", "router", "schedule", "report"]
+STEPS = ["pair", "privacy", "consents", "devmode", "launcher", "root", "dns", "router", "schedule", "report"]
 PY = sys.executable
 
 
@@ -285,6 +289,9 @@ def step_consents(c):
 # --------------------------------------------------------------------------
 def step_devmode(c):
     head(4, "Developer Mode: check, token, extend")
+    if c.a.root:
+        c.skip("devmode", "Rooted: Homebrew Channel keeps Tiles Home installed, so the Dev Mode timer doesn't matter.")
+        return
     tv = core.open_tv(c.tv_args())
     lps = launch_points(tv)
     tv.close()
@@ -351,6 +358,9 @@ def step_launcher(c):
         c.fail("launcher", f"Building the .ipk failed: {err.strip() or out.strip()}")
         return
     ipk = ipks[-1]
+    if c.a.root:
+        c.ok("launcher", f"Built {ipk.name} with your apps; the root step installs it.")
+        return
     tv = core.open_tv(c.tv_args())
     already = core.LAUNCHER_ID in launch_points(tv)
     tv.close()
@@ -444,8 +454,63 @@ class PiHole:
             pass
 
 
+def root_ssh_base(c):
+    base = ["ssh", "-p", str(c.a.root_port), "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
+    if c.a.root_key:
+        base += ["-i", os.path.expanduser(c.a.root_key)]
+    return base + [f"root@{c.st['tv']}"]
+
+
+def step_root(c):
+    head(6, "Rooted TV: Tiles Home on the Home button, blocking and guard on the TV")
+    if not c.a.root:
+        c.skip("root", "Not asked for. If Homebrew Channel has root on this TV, re-run with --root.")
+        return
+    if not shutil.which("ssh"):
+        c.fail("root", "No ssh command on this computer. Use the by-hand steps in GUIDE.html (Rooted TV).")
+        return
+    if not sorted((HERE / "dist").glob("io.github.lgprivacykit.tiles_*.ipk")):
+        run([PY, str(HERE / "tools" / "build_ipk.py")])
+    rc, out, err = run([PY, str(HERE / "tools" / "build_root.py")])
+    if rc:
+        c.fail("root", f"Bundling failed: {err.strip() or out.strip()}")
+        return
+    bundle = HERE / "dist" / "lgkit-root.tar.gz"
+    tiers = ",".join(c.a.root_tiers)
+    args = ["--from", "/tmp/lgkit-src", "--tiers", tiers]
+    if c.a.block_updates:
+        args.append("--block-updates")
+    if c.a.home_code:
+        args += ["--home-code", str(c.a.home_code)]
+    say(f"  Sends {bundle.name} ({bundle.stat().st_size // 1024} KB) to root@{c.st['tv']}:{c.a.root_port} and runs")
+    say(f"  root/install.sh {' '.join(args)}")
+    say("  Blocks: " + tiers + (" + LG firmware updates" if c.a.block_updates else "")
+        + ". The firewall stops apps reaching public DNS directly. Undo: `python3 setup.py undo`.")
+    if c.a.dry_run:
+        c.skip("root", "Would install it on the TV.")
+        return
+    if not c.ask("Install on the TV now? (ssh asks for the root password if you haven't set up a key;"
+                 " Homebrew Channel's default is alpine: change it)"):
+        c.skip("root", "Not installed.")
+        return
+    remote = ("rm -rf /tmp/lgkit-src && mkdir -p /tmp/lgkit-src && tar -xzf - -C /tmp/lgkit-src && sh /tmp/lgkit-src/root/install.sh "
+              + " ".join(shlex.quote(x) for x in args))
+    p = subprocess.run(root_ssh_base(c) + [remote], input=bundle.read_bytes(), stdout=subprocess.PIPE, timeout=300)
+    text = p.stdout.decode("utf-8", "replace")
+    for line in text.splitlines():
+        say("  | " + line)
+    if p.returncode or "Done." not in text:
+        c.fail("root", f"install.sh didn't finish (exit {p.returncode}). Check root SSH is on in Homebrew Channel.")
+        return
+    c.st["root"] = {"port": c.a.root_port, "key": c.a.root_key, "tiers": tiers, "block_updates": c.a.block_updates,
+                    "at": int(time.time())}
+    save_state(c.st)
+    c.ok("root", "Installed on the TV. Press Home: Tiles Home should open. Status: ssh root@TV "
+                 "sh /var/lib/webosbrew/lgkit/install.sh --status")
+
+
 def step_dns(c):
-    head(6, "DNS blocklists")
+    head(7, "DNS blocklists")
     tiers = c.a.tiers
     tv_only = [t for t in tiers if t in ("strict", "doh")]
     if c.a.pihole:
@@ -557,7 +622,7 @@ def mac_for(ip):
 
 
 def step_router(c):
-    head(7, "Router rules that stop the TV going around your DNS")
+    head(8, "Router rules that stop the TV going around your DNS")
     tv = c.st["tv"]
     mac = c.a.tv_mac or mac_for(tv)
     dns = c.st.get("dns_ip") or c.a.dns_ip
@@ -593,12 +658,17 @@ def maintain_cmd():
 
 
 def step_schedule(c):
-    head(8, "Timer: extend Developer Mode when due, re-check privacy settings")
+    head(9, "Timer: extend Developer Mode when due, re-check privacy settings")
+    if c.a.root or c.st.get("root"):
+        c.skip("schedule", "Rooted: the TV re-checks its own settings, so no computer timer is needed.")
+        return
     system = platform.system().lower()
     logf = core.CONFIG_DIR / "maintain.log"
     env = {"LGTV_PRIVACY_HOME": str(core.CONFIG_DIR)} if "LGTV_PRIVACY_HOME" in os.environ else {}
     cmd = maintain_cmd()
     say(f"  Every 3 hours: {' '.join(shlex.quote(x) for x in cmd)}  (log: {logf})")
+    say("  Optional. Tiles Home already extends Developer Mode by itself each week when you open it, so a")
+    say("  computer that is only on now and then is fine: the timer just catches up and re-checks settings.")
     if c.a.dry_run:
         c.skip("schedule", f"Would install it for {system}.")
         return
@@ -680,7 +750,7 @@ def remove_schedule(kind):
 # 9. HTML report
 # --------------------------------------------------------------------------
 def step_report(c):
-    head(9, "Summary")
+    head(10, "Summary")
     colours = {"done": "#0a7c66", "skipped": "#6b7280", "needs you": "#b45309", "failed": "#b91c1c"}
     rows = "".join(
         f'<tr><td>{html.escape(s)}</td><td><b style="color:{colours[r[0]]}">{html.escape(r[0])}</b></td>'
@@ -718,7 +788,7 @@ def cmd_run(a):
     if "pair" not in steps and not c.st.get("tv"):
         steps.insert(0, "pair")
     fns = {"pair": step_pair, "privacy": step_privacy, "consents": step_consents, "devmode": step_devmode,
-           "launcher": step_launcher, "dns": step_dns, "router": step_router, "schedule": step_schedule,
+           "launcher": step_launcher, "root": step_root, "dns": step_dns, "router": step_router, "schedule": step_schedule,
            "report": step_report}
     for s in steps:
         try:
@@ -726,7 +796,7 @@ def cmd_run(a):
                 if not step_pair(c):
                     step_report(c)
                     return 1
-            elif a.dry_run and s in ("privacy", "devmode", "launcher") and \
+            elif a.dry_run and s in ("privacy", "devmode", "launcher") and not a.root and \
                     not core.load_config().get("keys", {}).get(c.st.get("tv")):
                 c.skip(s, "Needs pairing first; a real run pairs, then does this step.")
             else:
@@ -762,6 +832,9 @@ def cmd_status(a):
     d = st.get("dns") or {}
     say(f"DNS:       {d.get('kind', 'not added by setup')} {d.get('url', '')}")
     say(f"Timer:     {st.get('schedule', 'not installed')}")
+    if st.get("root"):
+        say(f"Rooted:    installed on the TV {time.strftime('%d %b %Y', time.localtime(st['root']['at']))} "
+            f"(tiers {st['root']['tiers']})")
     if st.get("tv"):
         subprocess.run([PY, str(HERE / "lgtv_devmode.py"), "--host", st["tv"], *(["--insecure-port"] if a.insecure_port else []), "status"])
         subprocess.run([PY, str(HERE / "lgtv_privacy.py"), "--host", st["tv"], *(["--insecure-port"] if a.insecure_port else []), "audit"])
@@ -800,6 +873,18 @@ def cmd_undo(a):
                 ph.call("DELETE", f"/groups/{urllib.parse.quote(d['group'], safe='')}")
             ph.logout()
             st.pop("dns")
+    r = st.get("root")
+    if r:
+        say("  rooted TV: run install.sh --uninstall over SSH (hosts, firewall, agent, boot hook)")
+        if not a.dry_run and st.get("tv"):
+            cmd = ["ssh", "-p", str(r.get("port", 22)), "-o", "ConnectTimeout=10"] + \
+                  (["-i", os.path.expanduser(r["key"])] if r.get("key") else []) + \
+                  [f"root@{st['tv']}", "f=/var/lib/webosbrew/lgkit/install.sh; if [ -f $f ]; then sh $f --uninstall; "
+                   "else echo 'already removed from the TV'; fi"]
+            if subprocess.run(cmd).returncode == 0:
+                st.pop("root")
+            else:
+                say("    ! couldn't reach the TV; run that command on it yourself")
     for b in reversed(st.get("backups", [])):
         say(f"  TV settings: restore {b}")
         if not a.dry_run:
@@ -833,13 +918,23 @@ def main():
     p.add_argument("--tv-mac", help="TV MAC for router rules (found automatically if possible)")
     p.add_argument("--dev-key", default="~/.ssh/lgtv_webos", help="Developer Mode SSH key (fetched if missing)")
     p.add_argument("--ares-device", help="install with LG's ares-install to this device name instead of SSH")
+    p.add_argument("--root", action="store_true",
+                   help="the TV is rooted (Homebrew Channel): install the on-TV part over root SSH")
+    p.add_argument("--root-port", type=int, default=22, help="Homebrew Channel SSH port (default 22)")
+    p.add_argument("--root-key", help="SSH key for root@TV (default: ssh's own, or the password)")
+    p.add_argument("--root-tiers", type=lambda s: s.split(","), default=["base", "doh"],
+                   help="tiers for the TV's own hosts list (default base,doh; add strict for the most, "
+                        "which also stops the Content Store and app updates)")
+    p.add_argument("--block-updates", action="store_true",
+                   help="rooted: also block LG firmware updates (keeps root; you miss LG's security fixes)")
+    p.add_argument("--home-code", type=int, help="rooted: your remote's Home key code (root/find-home-key.js)")
     p.add_argument("--press-enter", action="store_true", help="newer firmware: confirm the hidden alert")
     p.add_argument("--insecure-port", action="store_true", help=argparse.SUPPRESS)
     a = p.parse_args()
     for s in a.only + a.skip:
         if s not in STEPS:
             p.error(f"unknown step {s!r}; steps are {', '.join(STEPS)}")
-    for t in a.tiers:
+    for t in a.tiers + a.root_tiers:
         if t not in ("base", "strict", "doh"):
             p.error(f"unknown tier {t!r}")
     sys.exit({"run": cmd_run, "maintain": cmd_maintain, "status": cmd_status, "undo": cmd_undo}[a.cmd](a))

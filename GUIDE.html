@@ -88,7 +88,7 @@ html{scroll-padding-top:20px}
   <p class="lede" style="margin-top:10px"><b>Kit v2, 25 Nov 2026.</b> This replaces the earlier copy of the guide and zip. See <a href="#changes" style="color:#fff">what changed</a>.</p>
   <p class="lede">On stock firmware you can switch off Live Plus (ACR), the home-screen ads and promotions, block LG's ad and telemetry servers at your DNS, and run a fast tile launcher. <b>Taking over the Home button and boot screen needs root</b>, and whether a 2023 model can still be rooted depends on its exact firmware. Nothing in this kit touches the TV until you run it.</p>
   <nav class="scroll" aria-label="Sections">
-   <a href="#changes">What changed in v2</a><a href="#layers">What works</a><a href="#kit">What's in the kit</a><a href="#onestep">One-step setup</a><a href="#setup">Setup by hand</a><a href="#renew">Auto-renewal</a><a href="#dns">Airtight DNS</a><a href="#root">Root status</a><a href="#risks">Risks</a><a href="#unverified">Not yet tested</a><a href="#sources">Sources</a>
+   <a href="#changes">What changed in v2</a><a href="#layers">What works</a><a href="#kit">What's in the kit</a><a href="#onestep">One-step setup</a><a href="#setup">Setup by hand</a><a href="#renew">Auto-renewal</a><a href="#nocomputer">No computer left on?</a><a href="#dns">Airtight DNS</a><a href="#root">Rooted TV</a><a href="#risks">Risks</a><a href="#unverified">Not yet tested</a><a href="#sources">Sources</a>
   </nav>
  </div>
 </header>
@@ -110,6 +110,9 @@ html{scroll-padding-top:20px}
    <div><b>Tiles Home v2 and one-step setup</b>
     <p>The launcher is now a ring of five pages you turn with left and right, with icon and title rows and favourites on the yellow button. <code>setup.py</code> sets up the whole kit in one run.</p>
     <p><b>Redo:</b> reinstall the .ipk (<a href="#tiles">how it works</a>). Your old tile layout isn't carried over.</p></div>
+   <div><b>No computer left on, and rooted TVs</b>
+    <p>Tiles Home now renews Developer Mode by itself each week you open it. If you don't run a Pi-hole, a cloud DNS service can take the short list (<a href="#nocomputer">steps</a>). On a rooted TV, <code>setup.py --root</code> makes the Home button open Tiles Home. It also puts the blocking, a firewall and the settings guard on the TV itself (<a href="#root">steps</a>).</p>
+    <p><b>Redo:</b> reinstall the .ipk to get the self-renewal.</p></div>
   </div>
  </div>
 </section>
@@ -152,7 +155,7 @@ html{scroll-padding-top:20px}
     <tr><td><code>blocklist/lg-store-aggressive.hosts</code></td><td>Optional: Content Store and app updates. Breaks installing apps.</td><td>Only if you're sure</td></tr>
     <tr><td><code>dist/…tiles_1.0.0_all.ipk</code> <span class="ver">v2</span></td><td>Tiles Home v2: a ring of five pages, icon and title rows, favourites on yellow. Ready to install.</td><td>Developer Mode</td></tr>
     <tr><td><code>launcher/</code> + <code>tools/build_ipk.py</code></td><td>Launcher source and a packager that needs no LG SDK.</td><td>Python</td></tr>
-    <tr><td><code>root/50-tiles-home</code></td><td>Boot hook: opens Tiles Home and bind-mounts a hosts blocklist. Fails safe, nothing written to system.</td><td>Root + Homebrew Channel</td></tr>
+    <tr><td><code>root/</code> + <code>setup.py --root</code></td><td>On-TV install: Home button and power-on open Tiles Home, blocklist in the TV's hosts file, firewall, settings guard every 6 hours. Nothing written to the system partition. <code>install.sh --uninstall</code> removes it.</td><td>Root + Homebrew Channel</td></tr>
     <tr><td><code>setup.py</code> <span class="ver">new</span></td><td>One guided run for everything: <code>run</code> (default), <code>status</code>, <code>undo</code>, and <code>maintain</code>, which the timer runs.</td><td>Python 3.8+</td></tr>
     <tr><td><code>lgtv_privacy.py guard</code> <span class="ver">new</span></td><td>Re-checks every readable privacy setting and switches back off any that LG turned on again, with a notice on the TV.</td><td>Paired TV</td></tr>
     <tr><td><code>lgtv_devmode.py</code> <span class="ver">v2</span></td><td>Keeps Developer Mode alive: <code>renew</code>, <code>status</code>, <code>schedule</code> (prints the cron / systemd / launchd / Task Scheduler entry), optional <code>set-token</code> / <code>fetch-token</code> for an exact hours-left check. <code>lgtv_privacy.py renew</code> and <code>tools/devmode_renew.py</code> now just forward to it.</td><td>Python, paired TV</td></tr>
@@ -236,7 +239,7 @@ python3 lgtv_privacy.py launch</pre>
    <li><h3>Make it the first thing you see (stock)</h3>
     <p><code>apply --profile home</code> turns off Home Auto Launch, so the TV goes straight to your last input. Long-press a number key on the Magic Remote and assign Tiles Home to it (on most 2023 remotes, long-pressing 0 opens the Quick Access editor). Pin it first in LG's app bar too. This is as far as stock firmware goes: the Home button keeps opening LG's home.</p></li>
    <li><h3>Optional: going further needs root</h3>
-    <p>Replacing the Home button, dropping the 1,000-hour timer, and on-TV blocking all need a rooted TV. See <a href="#root">Root status</a>. This kit doesn't cover rooting.</p></li>
+    <p>Replacing the Home button, dropping the 1,000-hour timer, and on-TV blocking all need a rooted TV. If your TV is already rooted, see <a href="#root">Rooted TV</a>. This kit doesn't cover how to root.</p></li>
   </ol>
  </div>
 </section>
@@ -253,7 +256,8 @@ python3 lgtv_devmode.py status           # last success, TV reachable?</pre>
 <pre>curl -o ~/.ssh/lgtv_webos http://192.168.1.50:9991/webos_rsa && chmod 600 ~/.ssh/lgtv_webos
 python3 lgtv_devmode.py fetch-token --key ~/.ssh/lgtv_webos   # asks for the passphrase shown in the app
 # or, if you already have it:  python3 lgtv_devmode.py set-token &lt;token&gt;</pre>
-  <h3>3. Put it on a timer</h3>
+  <div class="note ok"><b>New: Tiles Home renews it too.</b> When you open Tiles Home and the last renewal was a week or more ago, it extends Developer Mode itself. You don't need any computer for this. The timer below is an extra, for anyone with a computer that's often on. See <a href="#nocomputer">No computer left on?</a></div>
+  <h3>3. Optional: put it on a timer</h3>
   <p>Run <code>python3 lgtv_devmode.py schedule</code> on the machine that will do this (your PC, Mac, or a Raspberry Pi that stays on). It prints the exact line for that system with your paths filled in. Add it yourself. The timer runs every 3 hours, but the helper only extends about once a week. With <code>--polite</code> it waits until nothing is playing, unless it's 2 or more days late. It keeps retrying while the TV is off.</p>
 <pre># Linux / Raspberry Pi / macOS (crontab -e):
 17 */3 * * * /usr/bin/python3 /path/to/kit/lgtv_devmode.py renew --polite >> ~/.config/lgtv-privacy/devmode.log 2>&1
@@ -273,6 +277,38 @@ schtasks /Create /TN "LG Dev Mode extend" /SC HOURLY /MO 3 /F /TR "\"C:\Path\pyt
    </tbody>
   </table></div>
   <div class="note ok">The TV needs to be on, or in standby with <i>TV On With Mobile</i> and Quick Start+ on, when the helper runs. Retrying every 3 hours covers that. <code>--web-fallback</code> also tries LG's web reset while the TV is off, but there are reports that it answers "success" without resetting the TV's timer, so the helper only counts it if LG then reports about 1,000 hours. If Developer Mode ever does lapse, turn it on again and reinstall Tiles Home. Your layout is saved on the TV.</div>
+ </div>
+</section>
+
+<section class="band" id="nocomputer">
+ <div class="wrap">
+  <h2>No computer you can leave on? <span class="ver">new</span></h2>
+  <p>Most of the kit doesn't need one. You run <code>setup.py</code> once from any laptop, and after that the TV mostly looks after itself. Here is what each part needs. <b>Rooted TV?</b> Then <a href="#root">Rooted TV</a> puts the blocking and the guard on the TV itself, and you can skip this section.</p>
+  <div class="scroll"><table class="stk">
+   <thead><tr><th>Part</th><th>Needs a computer left on?</th><th>Without one</th></tr></thead>
+   <tbody>
+    <tr><td data-l="Part"><b>Privacy settings</b></td><td data-l="Needs">No</td><td data-l="Without one">Set once by <code>setup.py</code>. They stay set. A firmware update can turn some back on, so run <code>python3 setup.py maintain</code> from your laptop after an update.</td></tr>
+    <tr><td data-l="Part"><b>Tiles Home</b></td><td data-l="Needs">No</td><td data-l="Without one">Runs on the TV.</td></tr>
+    <tr><td data-l="Part"><b>Developer Mode renewal</b></td><td data-l="Needs">No</td><td data-l="Without one"><b>Tiles Home renews it.</b> When you open Tiles Home and the last renewal was 7 or more days ago, it extends Developer Mode. The Developer Mode app flashes up for a few seconds, then Tiles Home comes back. Settings page, <i>Dev Mode extended N days ago</i> shows when it last happened. Press OK on that row to extend now.</td></tr>
+    <tr><td data-l="Part"><b>DNS blocking</b></td><td data-l="Needs">Pi-hole does</td><td data-l="Without one">Use a filtering DNS service in the cloud, or your router if it can block names. See below.</td></tr>
+    <tr><td data-l="Part"><b>Privacy guard</b> (re-checks settings every 3 hours)</td><td data-l="Needs">Yes</td><td data-l="Without one">Skip it. If your laptop is on now and then, the timer from <code>setup.py</code> catches up when it's on, which is enough.</td></tr>
+   </tbody>
+  </table></div>
+  <div class="note ok"><b>The one rule:</b> open Tiles Home at least once every month or so. Developer Mode lasts about 41 days, and Tiles Home renews it each week you use it. If you go away for longer, open the Developer Mode app on the TV when you're back and press <i>Extend</i>. If it ever does lapse, turn Developer Mode on again and reinstall Tiles Home. Your favourites are saved on the TV.</div>
+
+  <h3>DNS without a Pi-hole: a filtering DNS service</h3>
+  <p>Services like <b>AdGuard DNS</b> and <b>NextDNS</b> run the blocklist for you. You give them the kit's list once, then point only the TV's DNS at them. The kit makes a short version of the list for this: each line blocks a name and everything under it, and it keeps only your own country's regional ad hosts. A UK copy is ready to paste. For another country, run <code>python3 tools/build_blocklists.py --country us</code>, for example.</p>
+  <ol>
+   <li><b>Make an account and a server.</b> With AdGuard DNS, create a private DNS server. With NextDNS, create a profile. Both have free tiers with a monthly query limit, which is plenty for one TV.</li>
+   <li><b>Add the list.</b> AdGuard DNS: under User rules, paste <code>blocklist/lg-base.cloud-gb.adguard.txt</code>. NextDNS: add each line of <code>blocklist/lg-base.cloud-gb.txt</code> to the Denylist (37 lines). For more blocking, add the strict and doh tiers' <code>.cloud.txt</code> lines too. They only reach the TV, because only the TV uses this server.</li>
+   <li><b>Link your home IP.</b> A TV can only use plain DNS, so the service needs to know your home IP address. Under the plain DNS or "Linked IP" setup, open the link it shows from your phone while it's on home Wi-Fi.</li>
+   <li><b>Point the TV at it.</b> On the TV: Settings, General, Network, your Wi-Fi or wired connection, Advanced Settings, Edit. Turn off automatic DNS and enter the DNS server IP the service gave you.</li>
+   <li><b>Check it.</b> From your laptop: <code>python3 tools/dns_check.py --dns &lt;that IP&gt;</code>.</li>
+  </ol>
+  <div class="note"><b>Know the trade-offs.</b> The service sees the TV's lookups instead of LG, so pick one whose privacy policy you're happy with. If your ISP changes your home IP, filtering stops until you open the link again on your phone. Don't use the router rules in <code>router/</code> as they are: they block the TV's outbound DNS, which this setup needs. Block port 853 only, and leave the TV's DNS fixed.</div>
+
+  <h3>Other ways, if you'd like them</h3>
+  <p><b>Your router.</b> If it runs OpenWrt, use <code>lg-base.dnsmasq.conf</code>. On MikroTik, use the DNS adlist feature with <code>lg-base.hosts</code>. Asus routers with Merlin firmware can use the Diversion add-on. Most ISP routers can't block names, so check yours first. <b>A small always-on box.</b> A Raspberry Pi Zero 2 W uses about 1 to 2 watts. It can run Pi-hole, the full router rules and the 3-hour guard, which gives you everything the kit does. Setup is a one-off afternoon.</p>
  </div>
 </section>
 
@@ -321,10 +357,48 @@ uci commit firewall && service firewall restart</pre>
 
 <section class="band" id="root">
  <div class="wrap">
-  <h2>Root status: a pointer, not a how-to</h2>
-  <p>Going lower than this kit goes needs root on webOS. That covers removing the 1,000-hour timer, taking over the Home button and boot screen, and blocking at the OS level. Whether a 2023 model can be rooted depends entirely on its exact firmware. Methods are patched over time, and LG firmware can't be downgraded, so once it's updated past a fix, the option is gone.</p>
-  <p>The webOS Homebrew community keeps the up-to-date answer. Check your model and firmware (<code>python3 lgtv_privacy.py info</code> prints both) at <a href="https://cani.rootmy.tv/">cani.rootmy.tv</a>, and read about the <a href="https://www.webosbrew.org/">Homebrew Channel</a> there. This kit doesn't include or walk through any rooting method. The optional <code>root/50-tiles-home</code> boot hook only matters on a TV that's already rooted.</p>
-  <div class="note">Holding back firmware updates to keep that option open also means going without LG's security fixes. If you do that, keep the TV off untrusted networks. The router rules above help either way.</div>
+  <h2>Rooted TV: Tiles Home as your home, blocking on the TV <span class="ver">new</span></h2>
+  <p>If Homebrew Channel on your TV shows root, the kit can do the rest on the TV itself. After one run from any laptop, nothing has to stay on. This section doesn't cover how to root. The webOS Homebrew community's own checker, <a href="https://cani.rootmy.tv/">cani.rootmy.tv</a>, and the <a href="https://www.webosbrew.org/">Homebrew Channel</a> pages cover that.</p>
+  <div class="scroll"><table class="stk">
+   <thead><tr><th>What</th><th>How it works</th></tr></thead>
+   <tbody>
+    <tr><td data-l="What"><b>Home button opens Tiles Home</b></td><td data-l="How">A small agent on the TV watches for LG's Home. Whenever it comes up, from the Home button, at power-on, or when LG pops it up by itself, Tiles Home opens on top. LG's launcher isn't patched, so firmware and the agent can't conflict. You'll still find LG's Home under Settings in Tiles Home.</td></tr>
+    <tr><td data-l="What"><b>Power-on and wake</b></td><td data-l="How">Tiles Home opens when the TV boots and when it wakes from standby.</td></tr>
+    <tr><td data-l="What"><b>Blocking on the TV</b></td><td data-l="How">The kit's blocklist goes into the TV's own hosts file: LG ads, ACR, telemetry, recommendation feeds and the DoH services. That's about 1,030 names by default. It works on any network, with no Pi-hole. Nothing is written to the system partition. The list is laid over the stock file at each boot, so a boot without the kit gives you the stock file back.</td></tr>
+    <tr><td data-l="What"><b>Firewall on the TV</b></td><td data-l="How">Apps can't go around the hosts file by asking a public DNS server directly, by using its DoH address, or by using DNS-over-TLS. Whatever DNS server your TV is actually using is always left alone.</td></tr>
+    <tr><td data-l="What"><b>Settings guard</b></td><td data-l="How">Every 6 hours, and a minute after each power-on, the TV re-checks the kit's privacy settings. It turns back off anything a firmware update or LG turned on, and shows you a short message when it does.</td></tr>
+    <tr><td data-l="What"><b>Developer Mode</b></td><td data-l="How">No longer needed for Tiles Home to stay installed. If you remove the Developer Mode app, Tiles Home hides its Developer Mode rows and stops extending it.</td></tr>
+   </tbody>
+  </table></div>
+
+  <h3>1. Install, once, from any laptop</h3>
+  <p>In Homebrew Channel's settings, turn on <i>SSH Server</i>. Then, from the kit folder:</p>
+<pre>python3 setup.py --root --tv 192.168.1.50
+# just the rooted part, if you've already run the rest:
+python3 setup.py --root --only root --tv 192.168.1.50</pre>
+  <p>ssh asks for the TV's root password. Homebrew Channel's default is <code>alpine</code>. Change it the first time you log in, with <code>passwd</code>, or set up a key and pass <code>--root-key</code>. With <code>--root</code>, setup skips the Developer Mode and computer-timer steps, because the TV handles both itself.</p>
+  <div class="scroll"><table class="stk">
+   <thead><tr><th>Option</th><th>Does</th></tr></thead>
+   <tbody>
+    <tr><td><code>--root-tiers base,strict,doh</code></td><td>Adds the strict tier for the most blocking. It also stops the Content Store, app updates, LG account and voice search. The default is <code>base,doh</code>.</td></tr>
+    <tr><td><code>--block-updates</code></td><td>Blocks LG firmware updates, so an update can't take root away. You also miss LG's security fixes, so keep the TV off networks you don't trust. Homebrew Channel has its own switch for this too.</td></tr>
+    <tr><td><code>--home-code N</code></td><td>Your remote's Home key code, so the Home button is caught the instant you press it, not when LG's Home appears. Find it on the TV with <code>node /var/lib/webosbrew/lgkit/find-home-key.js</code>, then press Home.</td></tr>
+   </tbody>
+  </table></div>
+
+  <h3>2. Or by hand, from a phone</h3>
+  <p>Any SSH app works, for example Termux on Android. Copy <code>dist/lgkit-root.tar.gz</code> from the kit to the phone, then:</p>
+<pre>scp lgkit-root.tar.gz root@192.168.1.50:/tmp/
+ssh root@192.168.1.50
+mkdir -p /tmp/kit &amp;&amp; tar -xzf /tmp/lgkit-root.tar.gz -C /tmp/kit &amp;&amp; sh /tmp/kit/root/install.sh</pre>
+  <p><code>install.sh --help</code> lists the same options as above, as <code>--tiers</code>, <code>--block-updates</code> and <code>--home-code</code>.</p>
+
+  <h3>3. Check, change, undo</h3>
+<pre>sh /var/lib/webosbrew/lgkit/install.sh --status      # hosts, firewall, agent, last guard run
+node /var/lib/webosbrew/lgkit/lgkit-agent.js --guard  # re-check the settings now
+sh /var/lib/webosbrew/lgkit/install.sh --uninstall   # all of it off (or: python3 setup.py undo)</pre>
+  <p>Logs are in <code>/var/lib/webosbrew/lgkit/</code> (<code>boot.log</code>, <code>agent.log</code>). To change an option, run <code>install.sh</code> again with the new flags.</p>
+  <div class="note"><b>What it doesn't do.</b> It doesn't delete or disable LG's own system services. Removing those can break the TV, and updates bring them back. Instead, the hosts file and firewall cut them off from the internet. <b>If the TV ever hangs at boot</b>, Homebrew Channel's failsafe skips all boot scripts next time. The kit's boot hook finishes in about a second and starts everything else in the background, to stay well clear of that.</div>
  </div>
 </section>
 
@@ -362,8 +436,10 @@ uci commit firewall && service firewall restart</pre>
    <li>The <code>.ipk</code> was built without LG's SDK and checked with <code>dpkg-deb</code>; it hasn't been installed on a TV. If Dev Manager rejects it, run <code>ares-package launcher</code> on the same folder.</li>
    <li><b>v2 renewal:</b> run end to end against the mock TV and a fake LG session site, covering due and not-due, polite deferral, return to the previous app, TV off, overdue, and web fallback. The extend call is the one LG's CLI and the Developer Mode app's Renew button use, but it hasn't been run on your set. <code>renew --force</code> followed by <code>status</code> will show whether it works on your TV.</li>
    <li><b>setup.py:</b> run end to end against the mock TV (pair, privacy, devmode, launcher build, router files, timer, maintain, guard, undo), plus fake Pi-hole v6 and AdGuard Home APIs (add, re-run, undo). It hasn't been run against your real Pi-hole or AdGuard yet; <code>--dry-run</code> first. Pi-hole v5 has no API for this, so on v5 use the manual step. Installing the launcher over Developer Mode SSH uses the same calls as LG's <code>ares-install</code>, but that path couldn't be tested here.</li>
+   <li><b>Tiles Home self-renewal:</b> tested in a browser with a stand-in for the TV's service bridge. It sends the extend once a week, comes back, and shows the date on the Settings page. It hasn't run on a TV yet. The Developer Mode app may stay open instead of returning, or ignore the extend when opened by another app. After installing, press OK on the <i>Extend Developer Mode</i> row and check the hours left in the Developer Mode app.</li>
+   <li><b>Cloud DNS lists:</b> built and checked for syntax only. They haven't been pasted into a real AdGuard DNS or NextDNS account yet.</li>
    <li><b>v2 DNS:</b> the build script, regexes and <code>dns_check.py</code> were tested against a fake DNS server. The router snippets follow each platform's documented syntax but weren't run on real routers. Read them and fill in your IPs and MAC first.</li>
-   <li>The root boot hook follows the Homebrew Channel <code>init.d</code> convention but is untested.</li>
+   <li><b>Rooted part:</b> <code>install.sh</code>, the boot hook and the agent were run end to end on a stand-in TV, with a fake <code>luna-send</code>, fake remote key events, and real hosts bind-mount and iptables in an isolated container. They were tested through <code>setup.py --root</code> and <code>undo</code>. Covered: LG Home redirected, Home key, "LG Home" from Tiles left alone, wake from standby, settings turned back off with a message, status and uninstall. Not yet run on a real TV. The likeliest differences are LG Home's app id on your firmware (the agent tries the common ones), whether your TV has <code>iptables</code> (it skips the firewall if not), and whether the Dev Mode install service accepts the .ipk. If it doesn't, install it from Homebrew Channel instead. <code>install.sh --status</code> shows each of these.</li>
   </ul>
  </div>
 </section>

@@ -11,6 +11,9 @@ Writes, for each tier (base, strict, doh):
   lg-<tier>.pihole-regex.txt Pi-hole regex deny filters (wildcards + regex)
   lg-<tier>.dnsmasq.conf     dnsmasq / OpenWrt / Pi-hole custom (blocks subdomains too)
   lg-<tier>.unbound.conf     Unbound / pfSense / OPNsense (local-zone, subdomains too)
+  lg-<tier>.cloud.txt        (use --country gb to trim it to about 35 lines) shortest list for cloud DNS denylists (NextDNS, AdGuard DNS, Control D):
+                             each line blocks the name and everything under it, so covered names are dropped
+  lg-<tier>.cloud.adguard.txt the same list as ||name^ rules, for AdGuard DNS user rules
 """
 import argparse
 import re
@@ -66,7 +69,10 @@ def esc(d):
     return re.escape(d).replace("\\-", "-")
 
 
-def build(tier, client=None):
+REGIONAL = re.compile(r"^([a-z]{2})-(ad|info|rdx2)-lg(smartad|tvsdp)-com\.aws-prd\.net$")
+
+
+def build(tier, client=None, country=None):
     src = ROOT / "src" / f"{tier}.txt"
     exact, wild, regex = parse(src)
     head = header(src) + [f"# Generated {time.strftime('%Y-%m-%d')} by tools/build_blocklists.py - edit src/{tier}.txt"]
@@ -85,6 +91,14 @@ def build(tier, client=None):
                                       "# Domains > Regex filter > Deny (or `pihole --regex '<line>'`). Catches hosts LG adds later."] + px
     dm = list(dict.fromkeys(wild + [d for d in exact if not in_wild(d)]))
     out["dnsmasq.conf"] = head + [f"address=/{d}/0.0.0.0" for d in dm] + [f"address=/{d}/::" for d in dm]
+    parents = set(dm)
+    has_parent = lambda d: any(".".join(d.split(".")[i:]) in parents for i in range(1, d.count(".")))  # noqa: E731
+    cloud = [d for d in dm if not has_parent(d)]
+    if country:  # cloud denylists are small: keep only your own country's regional ad hosts
+        cloud = [d for d in cloud if not REGIONAL.match(d) or REGIONAL.match(d).group(1) == country]
+    out["cloud.txt"] = head + ["# For NextDNS / AdGuard DNS / Control D denylists: each line also blocks its subdomains.",
+                               "# Regex rules can't go in these lists; the wildcards cover nearly all of them."] + [""] + cloud
+    out["cloud.adguard.txt"] = ["! " + l[2:] for l in head] + ["! For AdGuard DNS (cloud) user rules: paste the lines below."] + [f"||{d}^" for d in cloud]
     out["unbound.conf"] = head + ["server:"] + [f'  local-zone: "{d}." always_null' for d in dm]
     for ext, lines in out.items():
         (ROOT / f"lg-{tier}.{ext}").write_text("\n".join(lines) + "\n")
@@ -92,15 +106,17 @@ def build(tier, client=None):
         cl = [f"{r}$client='{client}'" for r in ag]
         (ROOT / f"lg-{tier}.adguard-tv-only.txt").write_text(
             "\n".join(["! " + l[2:] for l in head] + [f"! Applies only to the TV at {client}"] + cl) + "\n")
-    print(f"lg-{tier}: {len(plain)} names, {len(wild)} wildcards, {len(regex)} regex")
+    print(f"lg-{tier}: {len(plain)} names, {len(wild)} wildcards, {len(regex)} regex, {len(cloud)} cloud entries")
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--client", help="TV IP or AdGuard client name, for TV-only AdGuard rules")
+    p.add_argument("--country", type=str.lower, metavar="CC",
+                   help="two-letter country (e.g. gb): cloud.txt keeps only that country's regional ad hosts")
     a = p.parse_args()
     for tier in ("base", "strict", "doh"):
-        build(tier, a.client)
+        build(tier, a.client, a.country)
 
 
 if __name__ == "__main__":

@@ -2,12 +2,16 @@
  * Left/right: previous/next page (wraps). Up/down: move through the page's list. OK: open.
  * Yellow: add/remove favourite (the item stays on its own page). Red (on favourites): pick up, move, OK to drop.
  * Back: cancel a move, or return to favourites. No network requests, no analytics, no frameworks.
+ * Developer Mode: when Tiles Home opens and the last extend was 7+ days ago, it asks the Developer Mode app
+ * to extend (the same launch LG's own CLI uses: com.palmdts.devmode with {extend: true}), then comes back.
  */
 (function () {
   "use strict";
 
   var SELF = "io.github.lgprivacykit.tiles";
   var FAV_KEY = "tileshome.favourites.v2";
+  var DEV_KEY = "tileshome.devmode.lastExtend";
+  var DEV_EVERY = 7 * 24 * 3600 * 1000; // LG allows ~1000 h (~41 days); extend weekly to stay well clear
   var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27, RED: 403, YELLOW: 405, Y: 89, R: 82 };
   var VISIBLE = 7;
   var W = 640;
@@ -25,6 +29,7 @@
     gear: '<circle cx="32" cy="32" r="8"/><path d="M32 10v8M32 46v8M10 32h8M46 32h8M16.5 16.5l5.7 5.7M41.8 41.8l5.7 5.7M16.5 47.5l5.7-5.7M41.8 22.2l5.7-5.7"/>',
     code: '<path d="M24 20L12 32l12 12M40 20l12 12-12 12"/>',
     home: '<path d="M10 30l22-18 22 18v24H40V40H24v14H10z"/>',
+    renew: '<path d="M32 10a22 22 0 1 1-20 13"/><path d="M12 10v13h13"/><path d="M32 22v11l7 5"/>',
     reset: '<path d="M14 32a18 18 0 1 0 6-13.4"/><path d="M14 10v10h10"/>'
   };
   var STAR = '<svg class="fav" viewBox="0 0 64 64"><path d="M32 6l7.6 16.4 18 2-13.4 12.2 3.8 17.7L32 45.2l-16 9.1 3.8-17.7L6.4 24.4l18-2z"/></svg>';
@@ -82,6 +87,7 @@
       st.apps = [];
       (Array.isArray(baked) ? baked : []).forEach(function (a) { addApp(seen, a); });
       luna("luna://com.webos.applicationManager/listLaunchPoints", {}, function (r) {
+        st.lpOk = !!(r && r.launchPoints);
         ((r && r.launchPoints) || []).forEach(function (lp) {
           var icon = lp.largeIcon || lp.icon;
           if (seen[lp.id]) { if (!seen[lp.id].icon && icon) seen[lp.id].icon = icon; return; }
@@ -114,8 +120,9 @@
       { id: "com.palm.app.settings", title: "All settings", glyph: "gear", color: "#39414b" },
       { id: "com.palmdts.devmode", title: "Developer Mode", glyph: "code", color: "#39414b" },
       { id: "com.webos.app.home", title: "LG Home", glyph: "home", color: "#39414b" },
+      { action: "extend", id: "tiles:extend", title: devTitle(), glyph: "renew", color: "#39414b" },
       { action: "reset", id: "tiles:reset", title: "Reset favourites", glyph: "reset", color: "#39414b" }
-    ];
+    ].filter(function (x) { return hasDevMode() || (x.id !== "com.palmdts.devmode" && x.action !== "extend"); });
     var all = {};
     [apps, inputs, media, settings].forEach(function (l) { l.forEach(function (x) { if (!all[x.id]) all[x.id] = x; }); });
     // Favourites whose app isn't installed right now are kept in storage but not shown.
@@ -128,6 +135,43 @@
       { h: "settings", items: settings }
     ];
     st.pages.forEach(function (pg, i) { st.sel[i] = Math.min(st.sel[i] || 0, Math.max(0, pg.items.length - 1)); });
+  }
+
+  // ------------------------------------------------------------------ Developer Mode
+  function lastExtend() { var v = 0; try { v = +localStorage.getItem(DEV_KEY) || 0; } catch (e) {} return v; }
+  function devTitle() {
+    var t = lastExtend();
+    if (!t) return "Extend Developer Mode";
+    var days = Math.floor((Date.now() - t) / 86400000);
+    return "Dev Mode extended " + (days < 1 ? "today" : days === 1 ? "yesterday" : days + " days ago");
+  }
+  var extending = false;
+  function extendDevMode(manual) {
+    if (extending) return;
+    extending = true;
+    toast(manual ? "Extending Developer Mode\u2026" : "Keeping Developer Mode active\u2026");
+    luna("luna://com.webos.applicationManager/launch", { id: "com.palmdts.devmode", params: { extend: true } }, function (r) {
+      if (r && r.returnValue === false) {
+        extending = false;
+        toast("Couldn't reach Developer Mode" + (r.errorText ? ": " + r.errorText : ""));
+        return;
+      }
+      try { localStorage.setItem(DEV_KEY, String(Date.now())); } catch (e) {}
+      // the Developer Mode app extends as it opens; come back after a moment
+      setTimeout(function () {
+        luna("luna://com.webos.applicationManager/launch", { id: SELF }, function () {});
+        extending = false;
+        buildPages(); render();
+      }, 6000);
+    });
+  }
+  // On a rooted TV you may have removed the Developer Mode app; then there's nothing to extend.
+  function hasDevMode() {
+    return !st.lpOk || st.apps.some(function (a) { return a.id === "com.palmdts.devmode"; });
+  }
+  function maybeExtend() {
+    if (!hasDevMode()) return;
+    if (Date.now() - lastExtend() >= DEV_EVERY) extendDevMode(false);
   }
 
   // ------------------------------------------------------------------ render
@@ -178,6 +222,7 @@
     if (!it) return;
     var row = document.querySelector(".col[data-d='0'] .r.f");
     if (row) { row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
+    if (it.action === "extend") return extendDevMode(true);
     if (it.action === "reset") {
       try { localStorage.removeItem(FAV_KEY); } catch (e) {}
       return loadFavs(function () { buildPages(); render(); toast("Favourites reset"); });
@@ -250,7 +295,7 @@
     if (i === st.sel[st.p]) return open(current());
     st.sel[st.p] = i; render();
   });
-  document.addEventListener("webOSRelaunch", function () { st.p = 0; st.moving = false; render(); });
+  document.addEventListener("webOSRelaunch", function () { st.p = 0; st.moving = false; buildPages(); render(); maybeExtend(); });
 
   // ------------------------------------------------------------------ clock
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -262,9 +307,9 @@
   }
   setInterval(tick, 10000);
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) { tick(); loadApps(function () { buildPages(); render(); }); }
+    if (!document.hidden) { tick(); loadApps(function () { buildPages(); render(); maybeExtend(); }); }
   });
 
   tick();
-  loadFavs(function () { loadApps(function () { buildPages(); render(); }); });
+  loadFavs(function () { loadApps(function () { buildPages(); render(); setTimeout(maybeExtend, 1500); }); });
 })();
