@@ -2,18 +2,15 @@
 /* LG TV Privacy Kit - on-TV agent. ROOTED TVs ONLY (Homebrew Channel with root).
  *
  * Started at boot by lgkit-boot.sh (through Homebrew Channel's init.d). Runs on the TV itself,
- * so no computer has to stay on. It does three things:
+ * so no computer has to stay on. It does one thing: every GUARD_HOURS (default 6), and a minute
+ * after each power-on or wake, it re-reads the kit's privacy settings and turns back off anything a
+ * firmware update or LG turned on. If it changes anything, it shows a short message on the TV.
  *
- *   1. Home: whenever LG's Home comes up (Home button, power-on, wake from standby, or LG
- *      popping it up by itself), it opens Tiles Home on top. It doesn't patch LG's launcher.
- *      Exception: if you pick "LG Home" from inside Tiles Home, LG's Home is left alone.
- *   2. Power-on: opens Tiles Home at boot and when the TV wakes from standby (BOOT_TO_TILES=1).
- *   3. Guard: every GUARD_HOURS (default 6), and a minute after each power-on, it re-reads the
- *      kit's privacy settings and turns back off anything a firmware update or LG turned on.
- *      If it changes anything, it shows a short message on the TV.
+ * It doesn't touch the Home button: Tiles Home declares itself a Home app, and Home Chooser
+ * (org.webosbrew.homechooser, from Homebrew Channel) makes the Home button open it.
  *
  * Everything it does is in /var/lib/webosbrew/lgkit/agent.log and status.json.
- * Uses only luna-send and the remote's input events. ES5 so it runs on old webOS node too.
+ * Uses only luna-send. ES5 so it runs on old webOS node too.
  *
  *   node lgkit-agent.js            run (normally started by lgkit-boot.sh)
  *   node lgkit-agent.js --guard    run the settings guard once, print what it did, exit
@@ -25,19 +22,11 @@ var path = require("path");
 
 var DIR = process.env.LGKIT_DIR || path.dirname(__filename);
 var LUNA = process.env.LUNA_SEND || "luna-send";
-var APP = process.env.TILES_APP || "io.github.lgprivacykit.tiles";
-var HOME_APPS = (process.env.HOME_APPS || "com.webos.app.home,com.webos.app.homeconnect,com.webos.app.launcher")
-  .split(",").filter(Boolean);
-var HOME_CODE = parseInt(process.env.HOME_CODE || "0", 10); // 0 = not known yet; find-home-key.js finds it
-var BOOT_TO_TILES = process.env.BOOT_TO_TILES !== "0";
-var REDIRECT_HOME = process.env.REDIRECT_HOME !== "0";
 var GUARD_HOURS = parseFloat(process.env.GUARD_HOURS || "6");
-var INPUT_DIR = process.env.INPUT_DIR || "/dev/input";
 var LOG = path.join(DIR, "agent.log");
 var STATUS = path.join(DIR, "status.json");
 
-var status = { started: new Date().toISOString(), redirects: 0, lastRedirect: null, guardRuns: 0,
-               lastGuard: null, lastGuardChanged: [], homeKeySeen: false, pid: process.pid };
+var status = { started: new Date().toISOString(), guardRuns: 0, lastGuard: null, lastGuardChanged: [], pid: process.pid };
 
 function log(m) {
   try {
@@ -87,86 +76,11 @@ function subscribe(uri, params) {
   return cp.spawn(c.cmd, c.args);
 }
 function toast(msg) {
-  luna("luna://com.webos.notification/createToast", { sourceId: APP, message: msg }, function () {});
-}
-
-// ------------------------------------------------------------------ launching Tiles Home
-var lastLaunch = 0;
-function launchTiles(reason, force) {
-  // debounce repeats, except when LG Home has actually come up: then Tiles must go back on top
-  if (!force && Date.now() - lastLaunch < 1500) return;
-  lastLaunch = Date.now();
-  luna("luna://com.webos.applicationManager/launch", { id: APP }, function (r) {
-    if (r.returnValue === false) log("launch failed (" + reason + "): " + (r.errorText || "?"));
-    else log("opened Tiles Home (" + reason + ")");
-  });
-  status.redirects++; status.lastRedirect = new Date().toISOString() + " " + reason; saveStatus();
-}
-
-// ------------------------------------------------------------------ foreground app watch
-var fg = "", prevFg = "", lastHomeKey = 0;
-function onForeground(appId) {
-  if (!appId || appId === fg) return;
-  prevFg = fg; fg = appId;
-  if (!REDIRECT_HOME || HOME_APPS.indexOf(appId) < 0) return;
-  // You chose "LG Home" inside Tiles Home: the Home key wasn't pressed, the last app was Tiles.
-  if (prevFg === APP && status.homeKeySeen && Date.now() - lastHomeKey > 2500) {
-    log("LG Home opened from Tiles Home, leaving it");
-    return;
-  }
-  launchTiles("LG Home came up: " + appId, true);
-  // close LG's Home behind Tiles so it isn't left running (and can't reappear on Back)
-  setTimeout(function () { luna("luna://com.webos.applicationManager/closeByAppId", { id: appId }, function () {}); }, 1500);
-}
-function watchForeground() {
-  var p = subscribe("luna://com.webos.applicationManager/getForegroundAppInfo", { subscribe: true });
-  var buf = "";
-  p.stdout.on("data", function (d) {
-    buf += String(d).replace(/\r/g, "");
-    var lines = buf.split("\n");
-    buf = lines.pop();
-    lines.forEach(function (l) {
-      var i = l.indexOf("{");
-      if (i < 0) return;
-      try { var r = JSON.parse(l.slice(i)); if (r.appId !== undefined) onForeground(r.appId); } catch (e) {}
-    });
-  });
-  p.on("error", function (e) { log("foreground watch error: " + e.message); });
-  p.on("exit", function () { setTimeout(watchForeground, 5000); });
-}
-
-// ------------------------------------------------------------------ remote Home key
-// struct input_event: time (2 longs) + type(u16) + code(u16) + value(s32); 16 bytes on 32-bit, 24 on 64-bit.
-function watchKeys() {
-  if (!HOME_CODE) { log("HOME_CODE not set: relying on the foreground watch alone"); return; }
-  var sz = (process.arch === "x64" || process.arch === "arm64") ? 24 : 16;
-  var ents = [];
-  try { ents = fs.readdirSync(INPUT_DIR).filter(function (f) { return /^event\d+$/.test(f); }); } catch (e) {}
-  ents.forEach(function (f) {
-    var p = path.join(INPUT_DIR, f), fd;
-    try { fd = fs.openSync(p, "r"); } catch (e) { return; }
-    var buf = Buffer.alloc(sz * 64);
-    (function read() {
-      fs.read(fd, buf, 0, buf.length, null, function (err, n) {
-        if (err || !n) { try { fs.closeSync(fd); } catch (e) {} return; }
-        for (var o = 0; o + sz <= n; o += sz) {
-          var type = buf.readUInt16LE(o + sz - 8), code = buf.readUInt16LE(o + sz - 6), value = buf.readInt32LE(o + sz - 4);
-          if (type === 1 && value === 1 && code === HOME_CODE) {
-            lastHomeKey = Date.now();
-            if (!status.homeKeySeen) { status.homeKeySeen = true; saveStatus(); }
-            if (REDIRECT_HOME) launchTiles("Home button");   // at once: beats most of LG Home's animation
-          }
-        }
-        setImmediate(read);
-      });
-    })();
-  });
-  log("watching " + ents.length + " input devices for key " + HOME_CODE);
+  luna("luna://com.webos.notification/createToast", { sourceId: "io.github.lgprivacykit.tiles", message: msg }, function () {});
 }
 
 // ------------------------------------------------------------------ power-on / wake
 function onPowerOn(reason) {
-  if (BOOT_TO_TILES) setTimeout(function () { launchTiles(reason); }, reason === "boot" ? 3000 : 600);
   setTimeout(function () { guard(); }, 60000);
 }
 function watchPower() {
@@ -227,11 +141,8 @@ if (process.argv[2] === "--guard") {
     guard(function (changed) { console.log(changed.length ? "Changed: " + changed.join(", ") : "Nothing to change."); process.exit(0); });
   });
 } else probe(function () {
-  log("agent start: app=" + APP + " home=" + HOME_APPS.join("|") + " key=" + (HOME_CODE || "none") +
-      " boot=" + BOOT_TO_TILES + " guard=" + GUARD_HOURS + "h");
+  log("agent start: guard every " + GUARD_HOURS + "h and after power-on");
   saveStatus();
-  watchForeground();
-  watchKeys();
   watchPower();
   if (process.env.LGKIT_FIRST_BOOT !== "0") onPowerOn("boot");
   if (GUARD_HOURS > 0) setInterval(function () { guard(); }, GUARD_HOURS * 3600 * 1000);

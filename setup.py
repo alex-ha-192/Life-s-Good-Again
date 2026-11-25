@@ -560,8 +560,6 @@ def step_root(c):
     for flag in ("keep_store", "keep_voice", "no_lgws"):
         if getattr(c.a, flag):
             args.append("--" + flag.replace("_", "-"))
-    if c.a.home_code:
-        args += ["--home-code", str(c.a.home_code)]
     say(f"  Sends {bundle.name} ({bundle.stat().st_size // 1024} KB) to root@{c.st['tv']}:{c.a.root_port} and runs")
     say(f"  root/install.sh {' '.join(args)}")
     say(("  Uses Life's Good Without Spying (installed if missing) to block LG's ad/ACR/telemetry hosts and"
@@ -1021,7 +1019,7 @@ def main():
     p.add_argument("--keep-voice", action="store_true", help="rooted: keep LG's voice services (and the mic button)")
     p.add_argument("--no-lgws", action="store_true",
                    help="rooted: don't use Life's Good Without Spying; the kit's own hosts list instead")
-    p.add_argument("--home-code", type=int, help="rooted: your remote's Home key code (root/find-home-key.js)")
+    p.add_argument("--home-code", type=int, help=argparse.SUPPRESS)  # old option, ignored: Home Chooser handles Home
     p.add_argument("--press-enter", action="store_true", help="newer firmware: confirm the hidden alert")
     p.add_argument("--insecure-port", action="store_true", help=argparse.SUPPRESS)
     a = p.parse_args()

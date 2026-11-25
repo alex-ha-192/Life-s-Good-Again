@@ -11,5 +11,8 @@
   "iconColor": "#0c0c0e",
   "resolution": "1920x1080",
   "disableBackHistoryAPI": true,
-  "transparent": false
+  "transparent": false,
+  "appCategory": [
+    "home"
+  ]
 }

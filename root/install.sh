@@ -11,7 +11,8 @@
 #     then configured and switched on through its own nospy-ctl.sh.
 #   - the kit's extra names on top of LGWS's list (regional ad hosts, DoH services)
 #   - a firewall so apps can't go around it (public resolvers, DoH by IP, DNS-over-TLS)
-#   - Tiles Home, opened by the Home button, at power-on and after standby
+#   - Tiles Home, declared as a Home app: pick it in Home Chooser (from Homebrew Channel) and the
+#     Home button opens it. The kit doesn't intercept the Home button itself any more.
 #   - the privacy settings re-checked on the TV every 6 hours and after every power-on
 #
 # Options:
@@ -23,10 +24,7 @@
 #                       button stops working while they're stopped)
 #   --block-updates     also block LG firmware and app updates (keeps root; you miss security fixes)
 #   --no-lgws           don't use LGWS: put the kit's own whole list in /etc/hosts instead
-#   --home-code N       your remote's Home key code (find it with: node find-home-key.js)
 #   --no-firewall       skip the firewall rules
-#   --no-boot-to-tiles  don't open Tiles Home at power-on (the Home button still does)
-#   --no-redirect       don't take over LG Home at all
 #   --guard-hours N     how often to re-check settings (default 6, 0 = only after power-on)
 #   --skip-app          don't install/update the Tiles Home app
 #   --status            show what's active
@@ -37,7 +35,7 @@ D=/var/lib/webosbrew/lgkit
 INITD=/var/lib/webosbrew/init.d
 APP=io.github.lgprivacykit.tiles
 SRC=$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)
-TIERS=base,doh; BLOCK_UPDATES=0; HOME_CODE=""; FIREWALL=1; BOOT_TO_TILES=1; REDIRECT_HOME=1
+TIERS=base,doh; BLOCK_UPDATES=0; FIREWALL=1
 GUARD_HOURS=6; SKIP_APP=0; MODE=install; LGWS=1; KEEP_STORE=0; KEEP_VOICE=0
 LGWS_ID=ooo.lew.lifesgoodwithoutspying
 LGWS_DIR=/media/developer/apps/usr/palm/applications/$LGWS_ID
@@ -56,10 +54,9 @@ while [ $# -gt 0 ]; do
         --keep-store) KEEP_STORE=1 ;;
         --keep-voice) KEEP_VOICE=1 ;;
         --no-lgws) LGWS=0 ;;
-        --home-code) HOME_CODE=$2; shift ;;
+        --home-code) shift ;;   # old option: the Home button is now Home Chooser's job
         --no-firewall) FIREWALL=0 ;;
-        --no-boot-to-tiles) BOOT_TO_TILES=0 ;;
-        --no-redirect) REDIRECT_HOME=0 ;;
+        --no-boot-to-tiles|--no-redirect) ;;   # old options, nothing to turn off any more
         --guard-hours) GUARD_HOURS=$2; shift ;;
         --skip-app) SKIP_APP=1 ;;
         --status) MODE=status ;;
@@ -276,10 +273,10 @@ else
 fi
 
 # agent, boot hook, settings
-cp "$SRC/root/lgkit-agent.js" "$SRC/root/lgkit-boot.sh" "$SRC/root/find-home-key.js" "$SRC/root/install.sh" "$D/" || die "copy failed"
+cp "$SRC/root/lgkit-agent.js" "$SRC/root/lgkit-boot.sh" "$SRC/root/install.sh" "$D/" || die "copy failed"
 [ -s "$SRC/root/settings.json" ] && cp "$SRC/root/settings.json" "$D/"
 chmod 755 "$D/lgkit-boot.sh" "$D/install.sh"
-if [ -z "$HOME_CODE" ] && [ -f "$D/lgkit.env" ]; then HOME_CODE=$(sed -n 's/^HOME_CODE=//p' "$D/lgkit.env"); fi
+rm -f "$D/find-home-key.js"
 cat >"$D/lgkit.env" <<EOF
 # written by install.sh; edit and reboot (or re-run install.sh) to change
 TILES_APP=$APP
@@ -287,10 +284,7 @@ LGWS=$LGWS
 LGWS_BY_KIT=$LGWS_BY_KIT
 HOSTS=$([ "$LGWS" = 1 ] && echo 0 || echo 1)
 FIREWALL=$FIREWALL
-BOOT_TO_TILES=$BOOT_TO_TILES
-REDIRECT_HOME=$REDIRECT_HOME
 GUARD_HOURS=$GUARD_HOURS
-HOME_CODE=${HOME_CODE:-0}
 EOF
 
 remove_old_v1
@@ -348,7 +342,7 @@ if [ "$FIREWALL" = 1 ]; then
 fi
 i=0; while [ $i -lt 20 ] && ! pgrep -f lgkit-agent.js >/dev/null 2>&1; do i=$((i + 1)); sleep 1; done
 if pgrep -f lgkit-agent.js >/dev/null 2>&1; then
-    sleep 3; ok "agent running (Home button, power-on, settings guard)$(sed -n 's/.*"luna": *"\([^"]*\)".*/; luna-send: \1/p' "$D/status.json" 2>/dev/null)"
+    sleep 3; ok "agent running (settings guard)$(sed -n 's/.*"luna": *"\([^"]*\)".*/; luna-send: \1/p' "$D/status.json" 2>/dev/null)"
 else
     warn "agent still starting (it waits for the TV's app manager); check with --status in a minute"
 fi
@@ -358,6 +352,10 @@ if [ "$PROBLEMS" -gt 0 ]; then
     say "Status: sh $D/install.sh --status    Undo: sh $D/install.sh --uninstall"
     exit 1
 fi
-say "Done. Press Home on the remote: Tiles Home should open."
-[ "${HOME_CODE:-0}" = 0 ] && say "Tip: run 'node $D/find-home-key.js', press Home, then re-run with --home-code N so the Home button is caught even faster."
+say "Done."
+if app_installed org.webosbrew.homechooser; then
+    say "Home button: open Home Chooser, pick Tiles Home, confirm, then press Home."
+else
+    say "Home button: install Home Chooser from Homebrew Channel, open it, pick Tiles Home, confirm."
+fi
 say "Status any time: sh $D/install.sh --status    Undo: sh $D/install.sh --uninstall"
