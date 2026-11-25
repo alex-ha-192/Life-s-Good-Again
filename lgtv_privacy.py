@@ -520,6 +520,23 @@ def cmd_apps(args):
         print(f"{lp.get('id', ''):45} {lp.get('title', '')}")
 
 
+def icon_context(url):
+    """TLS context for an icon URL: unverified for the TV's own LAN address, normal otherwise."""
+    import ipaddress
+    import urllib.parse
+    host = urllib.parse.urlparse(url).hostname or ""
+    try:
+        lan = ipaddress.ip_address(host).is_private
+    except ValueError:
+        lan = host.endswith(".local")
+    if lan:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    return ssl.create_default_context()
+
+
 def cmd_export_tiles(args):
     """Write launcher/apps.json (+ icons) from the apps installed on the TV."""
     tv = open_tv(args)
@@ -539,8 +556,9 @@ def cmd_export_tiles(args):
         if icon and not args.no_icons and icon.startswith("http"):
             name = hashlib.sha1(aid.encode()).hexdigest()[:12] + ".png"
             try:
-                # Icons are served by the TV itself on the LAN.
-                with urllib.request.urlopen(icon, timeout=5) as resp:
+                # Icons are served by the TV itself, over HTTPS with LG's self-signed certificate,
+                # so certificate checks are skipped for LAN addresses only (as for the SSAP socket).
+                with urllib.request.urlopen(icon, timeout=5, context=icon_context(icon)) as resp:
                     (icon_dir / name).write_bytes(resp.read())
                 entry["icon"] = "icons/" + name
             except Exception as e:  # noqa: BLE001

@@ -34,6 +34,9 @@ def bundle():
     files += sorted((ROOT / "blocklist").glob("*.hosts"))
     ipks = sorted((ROOT / "dist").glob("io.github.lgprivacykit.tiles_*.ipk"), key=lambda p: p.stat().st_mtime)
     files += ipks[-1:]
+    # Life's Good Without Spying, if setup.py downloaded it (and its checksum) on this computer
+    files += [p for p in (ROOT / "dist" / "ooo.lew.lifesgoodwithoutspying.ipk",
+                          ROOT / "dist" / "ooo.lew.lifesgoodwithoutspying.ipk.sha256") if p.exists()]
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as t:
         for f in files:

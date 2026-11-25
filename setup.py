@@ -455,6 +455,79 @@ class PiHole:
             pass
 
 
+LGWS_ID = "ooo.lew.lifesgoodwithoutspying"
+LGWS_REPO = "https://github.com/lewisdoesstuff/lifesgoodwithoutspying"
+LGWS_MANIFEST = f"{LGWS_REPO}/releases/latest/download/{LGWS_ID}.manifest.json"
+CA_FILES = ["/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt", "/etc/ssl/cert.pem",
+            "/etc/ssl/ca-bundle.pem", "/usr/local/etc/openssl/cert.pem", "/opt/homebrew/etc/openssl@3/cert.pem"]
+
+
+def internet_get(url, timeout=60):
+    """GET a public HTTPS URL with certificate checks, even where Python has no CA bundle of its own:
+    certifi if installed, then the system's usual bundle files, then the curl command."""
+    import ssl
+    ctxs = []
+    try:
+        import certifi  # noqa: PLC0415
+        ctxs.append(ssl.create_default_context(cafile=certifi.where()))
+    except ImportError:
+        pass
+    ctxs.append(ssl.create_default_context())
+    ctxs += [ssl.create_default_context(cafile=f) for f in CA_FILES if os.path.exists(f)]
+    last = None
+    for ctx in ctxs:
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "lgtv-privacy-kit"}),
+                                        timeout=timeout, context=ctx) as r:
+                return r.read()
+        except urllib.error.URLError as e:
+            last = e
+            if not isinstance(getattr(e, "reason", None), ssl.SSLError):
+                break  # not a certificate problem: another bundle won't help
+    if shutil.which("curl"):
+        p = subprocess.run(["curl", "-fsSL", "--max-time", str(timeout), url], capture_output=True)
+        if p.returncode == 0:
+            return p.stdout
+        last = p.stderr.decode("utf-8", "replace").strip() or f"curl exit {p.returncode}"
+    raise RuntimeError(str(last))
+
+
+def fetch_lgws(c):
+    """Download Life's Good Without Spying on this computer (the TV may have no route to GitHub),
+    check it against the SHA-256 in its release manifest, and keep it in dist/ for the bundle."""
+    import hashlib
+    dest = HERE / "dist" / f"{LGWS_ID}.ipk"
+    try:
+        m = json.loads(internet_get(LGWS_MANIFEST))
+        url, want = m["ipkUrl"], (m.get("ipkHash") or {}).get("sha256", "")
+    except Exception as e:  # noqa: BLE001
+        if dest.exists():
+            say(f"  ! couldn't check for a newer LGWS ({e}); using the copy already in dist/")
+            return True
+        say(f"  ! couldn't download LGWS's release manifest: {e}")
+        return False
+    if not url.startswith(LGWS_REPO + "/") or not re.fullmatch(r"[0-9a-f]{64}", want or ""):
+        say(f"  ! LGWS manifest looks wrong (url {url!r}); not using it")
+        return False
+    if dest.exists() and hashlib.sha256(dest.read_bytes()).hexdigest() == want:
+        say(f"  LGWS {m.get('version', '')}: already downloaded, SHA-256 matches")
+        return True
+    try:
+        data = internet_get(url, timeout=180)
+    except Exception as e:  # noqa: BLE001
+        say(f"  ! couldn't download LGWS: {e}")
+        return False
+    got = hashlib.sha256(data).hexdigest()
+    if got != want:
+        say(f"  ! LGWS download doesn't match its manifest (got {got[:12]}…, want {want[:12]}…); not using it")
+        return False
+    dest.parent.mkdir(exist_ok=True)
+    dest.write_bytes(data)
+    (dest.parent / (dest.name + ".sha256")).write_text(f"{want}  {dest.name}\n")
+    say(f"  LGWS {m.get('version', '')}: downloaded on this computer ({len(data) // 1024} KB), SHA-256 matches")
+    return True
+
+
 def root_ssh_base(c):
     base = ["ssh", "-p", str(c.a.root_port), "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=10"]
     if c.a.root_key:
@@ -472,6 +545,10 @@ def step_root(c):
         return
     if not sorted((HERE / "dist").glob("io.github.lgprivacykit.tiles_*.ipk")):
         run([PY, str(HERE / "tools" / "build_ipk.py")])
+    if not c.a.no_lgws and not c.a.dry_run:
+        say("  Life's Good Without Spying: fetching it here so the TV doesn't have to")
+        if not fetch_lgws(c):
+            say("  The TV will use LGWS if it's already installed there (from Homebrew Channel), or try GitHub itself.")
     rc, out, err = run([PY, str(HERE / "tools" / "build_root.py")])
     if rc:
         c.fail("root", f"Bundling failed: {err.strip() or out.strip()}")
@@ -506,7 +583,14 @@ def step_root(c):
     for line in text.splitlines():
         say("  | " + line)
     if p.returncode or "Done." not in text:
-        c.fail("root", f"install.sh didn't finish (exit {p.returncode}). Check root SSH is on in Homebrew Channel.")
+        why = [l[2:] for l in text.splitlines() if l.startswith("! ")]
+        if p.returncode == 255 and not text.strip():
+            msg = "Couldn't log in over SSH. Check SSH Server is on in Homebrew Channel and the root password."
+        elif why:
+            msg = why[-1]
+        else:
+            msg = f"install.sh stopped (exit {p.returncode}); see the lines above."
+        c.fail("root", msg)
         return
     c.st["root"] = {"port": c.a.root_port, "key": c.a.root_key, "tiers": tiers, "block_updates": c.a.block_updates,
                     "at": int(time.time())}

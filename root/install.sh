@@ -45,7 +45,7 @@ LGWS_CTL=$LGWS_DIR/init/nospy-ctl.sh
 LGWS_MANIFEST=https://github.com/lewisdoesstuff/lifesgoodwithoutspying/releases/latest/download/$LGWS_ID.manifest.json
 KIT_MARK="# --- LG TV Privacy Kit extras"
 
-die() { echo "! $*" >&2; exit 1; }
+die() { echo "! $*"; exit 1; }   # stdout, so it lands in order when run over ssh
 say() { echo "$*"; }
 
 while [ $# -gt 0 ]; do
@@ -103,22 +103,51 @@ lgws_wait() { # wait for an LGWS background job
     done
     return 1
 }
+install_ipk_lgws() { # $1 = ipk path on the TV
+    luna-send -n 1 -w 60000 luna://com.webos.appInstallService/dev/install \
+        "{\"id\":\"$LGWS_ID\",\"ipkUrl\":\"$1\",\"subscribe\":true}" >/dev/null 2>&1
+    i=0; while [ $i -lt 30 ] && [ ! -f "$LGWS_CTL" ]; do i=$((i + 1)); sleep 2; done
+    [ -f "$LGWS_CTL" ] || { say "  ! the TV's installer didn't install LGWS"; return 1; }
+    say "  LGWS: installed ($(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$LGWS_DIR/appinfo.json"))"
+}
+curl_why() { # explain a curl exit code
+    case "$1" in
+        6) echo "the TV couldn't look up github.com (DNS)" ;;
+        7|28) echo "the TV couldn't connect to GitHub (no route out, or timed out)" ;;
+        35|51|58|60|77|83) echo "the TV's TLS/certificate check failed (old CA bundle on the TV)" ;;
+        22) echo "GitHub answered with an error" ;;
+        *) echo "curl exit $1" ;;
+    esac
+}
 install_lgws() {
-    say "  LGWS: not installed; fetching the latest release from GitHub"
+    tmpipk=/media/developer/temp/lgws.ipk
+    mkdir -p /media/developer/temp
+    # 1. a copy the laptop downloaded and checked (setup.py puts it in the bundle)
+    local_ipk=$SRC/dist/$LGWS_ID.ipk
+    if [ -s "$local_ipk" ]; then
+        want=$(cut -d' ' -f1 "$local_ipk.sha256" 2>/dev/null)
+        got=$(sha256sum "$local_ipk" | cut -d' ' -f1)
+        if [ -n "$want" ] && [ "$want" != "$got" ]; then
+            say "  ! the LGWS copy from your computer got damaged on the way (checksum); trying GitHub"
+        else
+            say "  LGWS: installing the copy your computer downloaded and checked"
+            cp "$local_ipk" "$tmpipk" && install_ipk_lgws "$tmpipk"; rc=$?; rm -f "$tmpipk"
+            [ $rc = 0 ] && return 0
+        fi
+    fi
+    # 2. straight from GitHub, if the TV can get there
+    say "  LGWS: not installed; trying to fetch it from GitHub on the TV"
     command -v curl >/dev/null 2>&1 || { say "  ! no curl on this TV"; return 1; }
-    m=$(curl -fsSL --max-time 30 "$LGWS_MANIFEST") || { say "  ! couldn't download the LGWS manifest"; return 1; }
+    m=$(curl -fsL --max-time 30 "$LGWS_MANIFEST"); rc=$?
+    [ $rc = 0 ] || { say "  ! couldn't download the LGWS manifest: $(curl_why $rc)"; return 1; }
     url=$(printf '%s' "$m" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.ipkUrl)})')
     sum=$(printf '%s' "$m" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log((j.ipkHash||{}).sha256||"")})')
     case "$url" in https://github.com/lewisdoesstuff/lifesgoodwithoutspying/*) ;; *) say "  ! unexpected download address: $url"; return 1 ;; esac
-    mkdir -p /media/developer/temp
-    curl -fsSL --max-time 120 -o /media/developer/temp/lgws.ipk "$url" || { say "  ! download failed"; return 1; }
-    got=$(sha256sum /media/developer/temp/lgws.ipk | cut -d' ' -f1)
-    [ -n "$sum" ] && [ "$got" = "$sum" ] || { say "  ! checksum mismatch, not installing"; rm -f /media/developer/temp/lgws.ipk; return 1; }
-    luna-send -n 1 -w 60000 luna://com.webos.appInstallService/dev/install \
-        "{\"id\":\"$LGWS_ID\",\"ipkUrl\":\"/media/developer/temp/lgws.ipk\",\"subscribe\":true}" >/dev/null 2>&1
-    i=0; while [ $i -lt 30 ] && [ ! -f "$LGWS_CTL" ]; do i=$((i + 1)); sleep 2; done
-    rm -f /media/developer/temp/lgws.ipk
-    [ -f "$LGWS_CTL" ] && say "  LGWS: installed ($(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$LGWS_DIR/appinfo.json"))"
+    curl -fsL --max-time 120 -o "$tmpipk" "$url"; rc=$?
+    [ $rc = 0 ] || { say "  ! LGWS download failed: $(curl_why $rc)"; return 1; }
+    got=$(sha256sum "$tmpipk" | cut -d' ' -f1)
+    [ -n "$sum" ] && [ "$got" = "$sum" ] || { say "  ! checksum mismatch, not installing"; rm -f "$tmpipk"; return 1; }
+    install_ipk_lgws "$tmpipk"; rc=$?; rm -f "$tmpipk"; return $rc
 }
 remove_old_v1() {
     # v1 of the kit shipped these optional hooks; the agent replaces them
@@ -170,7 +199,11 @@ mkdir -p "$D" "$INITD" || die "can't create $D"
 # Life's Good Without Spying: the telemetry layer
 LGWS_BY_KIT=$(sed -n 's/^LGWS_BY_KIT=//p' "$D/lgkit.env" 2>/dev/null); LGWS_BY_KIT=${LGWS_BY_KIT:-0}
 if [ "$LGWS" = 1 ]; then
-    [ -f "$LGWS_CTL" ] || install_lgws || die "Life's Good Without Spying isn't installed and couldn't be fetched. Install it from Homebrew Channel, then run this again (or use --no-lgws)."
+    if [ -f "$LGWS_CTL" ]; then
+        say "  LGWS: already installed ($(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$LGWS_DIR/appinfo.json"))"
+    else
+        install_lgws || die "Life's Good Without Spying isn't on the TV and couldn't be installed. Fix: open Homebrew Channel on the TV, install \"Life's Good Without Spying\", then run this again. Or run again with --no-lgws to use the kit's own blocklist instead. Nothing has been changed yet."
+    fi
     # an older kit's own hosts mount would stop LGWS mounting its list
     grep -q " /etc/hosts " /proc/mounts && ! grep -qF "# lifesgoodwithoutspying" /etc/hosts && unmount_hosts
     on() { sh "$LGWS_CTL" set "$1" "$2" >/dev/null || say "  ! LGWS didn't take $1=$2"; }
