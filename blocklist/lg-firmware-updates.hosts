@@ -1,0 +1,6 @@
+# lg-firmware-updates: stops automatic firmware checks/downloads.
+# Use ONLY if you want to stay on a firmware that can still be rooted.
+# Downside: you also miss security fixes. Remove the line to update again.
+# Primary control is still the TV menu: Support > Software Update > Auto Update OFF.
+
+0.0.0.0 snu.lge.com

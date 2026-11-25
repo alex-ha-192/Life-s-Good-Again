@@ -1,0 +1,25 @@
+! lg-strict: the "as close to complete as DNS gets" tier. Use WITH lg-base.
+! Blocks LG's whole service platforms for the TV. Expect, and accept:
+!   - LG Content Store, app installs/updates, LG account sign-in stop working
+!   - LG home screen loses icons/thumbnails and some rows; Search and voice stop
+!   - firmware updates stop (lge.com) - so you also miss security fixes
+!   - ThinQ / LG phone apps stop reaching the TV through the cloud
+! Netflix, YouTube, Prime, Disney+, Plex, Jellyfin etc. use their own domains and keep working.
+! Best scoped to the TV only (Pi-hole group / AdGuard client), see GUIDE.html.
+! Generated 2026-11-25 by tools/build_blocklists.py - edit src/strict.txt
+||lgtvsdp.com^
+||nextlgsdp.com^
+||lgappstv.com^
+||lgtvcommon.com^
+||wiselg.com^
+||lgwebostv.com^
+||lgtviot.com^
+||lgthinq.com^
+||lge.com^
+||lge.com.edgekey.net^
+||lgeapi.com^
+||lgecloud.com^
+||lgads.tv^
+||adsmeasurement.com^
+||alphonso.tv^
+||cjpowercast.com.edgesuite.net^

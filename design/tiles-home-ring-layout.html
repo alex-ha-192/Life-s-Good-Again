@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiles Home ring layout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday: one design to react to, driven with the arrows
+   IDEA layout C refined: a ring of five pages, two either side, wrap-around, icons and titles only
+   PICTURE the TV screen itself, large and live; a density switch beside it
+   COLOUR night room in both themes; inside the TV, deep navy ground, white type, app colours on icon tiles
+   TYPE Segoe UI where installed, else Open Sans (same designer, open licence), bundled on the TV
+   LAYOUT title and controls on top, the TV full width, then the notes in two columns; stacks under 900px */
+:root{color-scheme:dark;--bg:#0d0e11;--ink:#eef0f4;--dim:#9aa0ab;--line:#262932;--card:#15171c;--acc:#2ec4b6}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:16px/1.55 "Segoe UI","Open Sans",system-ui,sans-serif;overflow-x:clip}
+.band{padding-block:clamp(24px,3.5vw,48px);padding-inline:max(4vw,16px)}
+.wrap{max-width:1400px;margin:0 auto}
+h1{font-size:clamp(30px,4vw,46px);font-weight:300;letter-spacing:-.02em;line-height:1.08;margin:0;text-wrap:balance}
+h2{font-size:22px;font-weight:600;margin:0 0 6px;line-height:1.2}
+p{margin:8px 0;max-width:74ch;color:#c9cdd6}
+.head{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+.bezel{background:#000;padding:12px;border-radius:6px;box-shadow:0 0 0 1px #2b2e36}
+.tv{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000;outline:none}
+.tv:focus-visible{box-shadow:0 0 0 3px var(--acc)}
+.scr{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;color:#fff;overflow:hidden;font-family:"Segoe UI","Open Sans",sans-serif;background:radial-gradient(120% 90% at 50% 0%,#14315a,#0a1830 55%,#060d1c)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.bar button{font:600 15px "Segoe UI","Open Sans",sans-serif;color:var(--ink);background:#1b1e25;border:1px solid #343844;min-width:48px;min-height:44px;padding:0 14px;cursor:pointer}
+.bar button:hover{background:#252a33}
+.bar button[aria-pressed=true]{background:var(--acc);color:#04201d;border-color:var(--acc)}
+.bar button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.bar output{color:var(--dim);font-size:14.5px;margin-left:6px}
+.bar .sp{flex:1}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:28px}
+.notes>div{background:var(--card);border:1px solid var(--line);padding:16px 18px}
+.notes p{font-size:15px;margin:6px 0}
+.notes code{background:#0b0c0f;border:1px solid var(--line);padding:1px 6px;font-size:13.5px}
+/* inside the screen */
+.scr.cb .clk{top:auto;bottom:50px}
+.clk{position:absolute;right:110px;top:48px;font-size:36px;font-weight:300;opacity:.7}
+.scr.cb .col{top:60px}
+.col{position:absolute;top:130px;transform-origin:50% 0}
+.col h3{margin:0 0 26px;font-size:80px;font-weight:300;letter-spacing:-2px;line-height:1;white-space:nowrap}
+.rows{display:flex;flex-direction:column}
+.r{display:flex;align-items:center;gap:26px;padding:0 18px 0 12px}
+.r .ic{flex:none;display:grid;place-items:center}
+.r .ic svg{fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.r .ic svg .fl{fill:#fff;stroke:none}
+.r .t{font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r.f{background:rgba(255,255,255,.13)}
+.r.f .ic{box-shadow:0 0 0 4px #fff}
+.r.f .t{font-weight:400}
+.mir{text-align:right}
+.mir .r{flex-direction:row-reverse;padding:0 12px 0 18px}
+.more{font-size:24px;opacity:.5;padding:10px 14px}
+.r .fav{flex:none;width:30px;height:30px;fill:#8ff0e3;opacity:.9}
+.mir .r .fav{order:-1}
+.r.mv{background:rgba(46,196,182,.22);box-shadow:inset 0 0 0 3px #2ec4b6}
+.r.mv .ic{box-shadow:none}
+.toast{position:absolute;left:50%;margin-left:-330px;width:660px;text-align:center;bottom:50px;background:#0f1a2e;border:2px solid #2ec4b6;padding:18px 28px;font-size:30px;opacity:0;transform:translateY(16px);transition:opacity .2s,transform .2s}
+.toast.show{opacity:1;transform:none}
+.k{display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-1px}
+.flash{animation:fl .3s ease-out}
+@keyframes fl{from{filter:brightness(1.9)}to{filter:none}}
+@media(max-width:900px){.notes{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.flash{animation:none}}
+</style>
+</head>
+<body>
+<section class="band">
+ <div class="wrap">
+  <div class="head">
+   <div>
+    <h1>Layout C, refined: a ring of five pages with icons and titles only</h1>
+    <p>Paging wraps around. The page in the middle is the one you're on, and the two pages each side shrink and fade, so the whole menu is always in view. Click the screen and use your arrow keys, or the buttons.</p>
+   </div>
+  </div>
+  <div class="bezel"><div class="tv" id="tv" tabindex="0" role="application" aria-label="Tiles Home mockup. Arrow keys move."><div class="scr cb" id="scr"></div></div></div>
+  <div class="bar" id="bar">
+   <button data-k="left" aria-label="Previous page">←</button><button data-k="up" aria-label="Up">↑</button><button data-k="down" aria-label="Down">↓</button><button data-k="right" aria-label="Next page">→</button><button data-k="ok">OK</button>
+   <output id="out"></output><span class="sp"></span>
+   <button data-c="b" aria-pressed="true">Clock bottom right</button><button data-c="t" aria-pressed="false">Clock top right</button><button data-k="yellow"><i class="k" style="background:#e0c419"></i>Favourite</button><button data-k="red"><i class="k" style="background:#d33"></i>Move</button>
+  </div>
+  <div class="notes">
+   <div><h2>Favourites</h2><p>On any page, press <b>yellow</b> on an app, input or setting to add it to favourites. It stays where it was and gets a small star there. Press yellow again to take it out.</p><p>On the favourites page, yellow removes it from favourites only. <b>Red</b> picks it up: move it with ↑ ↓, then press OK or red to put it down. Keyboard: Y and R.</p></div>
+   <div><h2>Icons</h2><p>On the TV, every row uses the app's own icon, taken from the TV by <code>export-tiles</code>. Here they're stand-in glyphs on each app's colour, because the mockup can't show the real logos. Inputs use the TV's own HDMI, antenna and USB icons.</p></div>
+   <div><h2>Font</h2><p>Segoe UI is Microsoft's and can't be shipped inside the app. Your computer shows it here if it's installed. On the TV the launcher will bundle <b>Open Sans</b>, which has an open licence and the same designer as Segoe UI, so it looks very close. Selawik, Microsoft's open Segoe stand-in, is an option too.</p></div>
+  </div>
+ </div>
+</section>
+<script>
+{
+const G = {
+ play:'<path class="fl" d="M24 18l24 14-24 14z"/>',
+ film:'<rect x="10" y="14" width="44" height="36" rx="3"/><path d="M10 24h44M10 40h44M22 14v10M42 14v10M22 40v10M42 40v10"/>',
+ n:'<path d="M20 50V14l24 36V14"/>',
+ star:'<path d="M32 10l6.5 14 15 1.6-11.2 10 3.2 14.9L32 43l-13.5 7.5 3.2-14.9-11.2-10 15-1.6z"/>',
+ chev:'<path d="M24 16l16 16-16 16"/>',
+ tv:'<rect x="8" y="14" width="48" height="32" rx="3"/><path d="M24 54h16M32 46v8"/>',
+ hdmi:'<path d="M10 24h44v10l-6 8H16l-6-8z"/><path d="M18 30h28"/>',
+ ant:'<path d="M32 26v28M20 54h24M32 26L18 10M32 26l14-16"/><circle cx="32" cy="26" r="3"/>',
+ usb:'<rect x="22" y="8" width="20" height="16"/><rect x="16" y="24" width="32" height="32" rx="3"/>',
+ folder:'<path d="M8 18h18l5 6h25v26H8z"/>',
+ globe:'<circle cx="32" cy="32" r="22"/><path d="M10 32h44M32 10c8 8 8 36 0 44M32 10c-8 8-8 36 0 44"/>',
+ gear:'<circle cx="32" cy="32" r="8"/><path d="M32 10v8M32 46v8M10 32h8M46 32h8M16.5 16.5l5.7 5.7M41.8 41.8l5.7 5.7M16.5 47.5l5.7-5.7M41.8 22.2l5.7-5.7"/>',
+ music:'<path d="M24 46V16l26-5v30"/><circle cx="18" cy="46" r="6"/><circle cx="44" cy="41" r="6"/>',
+ shield:'<path d="M32 8l20 8v14c0 13-9 21-20 26C21 51 12 43 12 30V16z"/><path d="M23 32l6 6 12-13"/>',
+ cam:'<rect x="8" y="18" width="34" height="28" rx="3"/><path d="M42 28l14-8v24l-14-8"/>',
+ photo:'<rect x="8" y="12" width="48" height="40" rx="3"/><circle cx="22" cy="26" r="5"/><path d="M8 46l16-14 12 10 8-6 12 10"/>',
+ wifi:'<path d="M8 26c14-12 34-12 48 0M16 34c9-8 23-8 32 0M24 42c5-4 11-4 16 0"/><circle cx="32" cy="50" r="2"/>',
+ sound:'<path d="M10 26h10l12-10v32L20 38H10z"/><path d="M42 24c4 4 4 12 0 16M48 18c8 8 8 20 0 28"/>',
+ pic:'<rect x="8" y="12" width="48" height="34" rx="3"/><path d="M8 40l14-12 10 8 10-6 14 10"/>',
+ code:'<path d="M24 20L12 32l12 12M40 20l12 12-12 12"/>',
+ grid:'<rect x="12" y="12" width="16" height="16"/><rect x="36" y="12" width="16" height="16"/><rect x="12" y="36" width="16" height="16"/><rect x="36" y="36" width="16" height="16"/>',
+ tile:'<rect x="12" y="12" width="40" height="40"/><path d="M12 32h40M32 12v40"/>',
+ game:'<path d="M14 24h36a8 8 0 0 1 8 8v4a8 8 0 0 1-14 5l-3-3H23l-3 3a8 8 0 0 1-14-5v-4a8 8 0 0 1 8-8z"/><path d="M20 30v8M16 34h8"/><circle cx="42" cy="32" r="1.5"/><circle cx="46" cy="36" r="1.5"/>'
+};
+const PAGES = [
+ {h:'favourites', items:[]},
+ {h:'apps', items:[['Netflix','#b3123a','n'],['YouTube','#c4302b','play'],['Prime Video','#1f6fb8','play'],['Disney+','#2c2f8f','star'],['Plex','#c76f12','chev'],['Spotify','#178a43','music'],['Apple TV','#3a3f47','film'],['Browser','#15806e','globe'],['Camera','#6b3fb0','cam'],['Photos','#7a3fb0','photo'],['Tiles Home','#0e8a87','tile'],['All apps','#39414b','grid']]},
+ {h:'inputs', items:[['PlayStation','#13716d','game'],['Laptop','#13716d','hdmi'],['HDMI 3','#13716d','hdmi'],['Live TV','#1f5fbf','ant'],['USB drive','#c76f12','usb']]},
+ {h:'media', items:[['Photos','#7a3fb0','photo'],['Films','#c76f12','film'],['TV shows','#c76f12','tv'],['Music','#178a43','music'],['USB drive','#c76f12','folder']]},
+ {h:'settings', items:[['Picture','#39414b','pic'],['Sound','#39414b','sound'],['Privacy','#178a43','shield'],['Developer Mode','#39414b','code'],['Network','#39414b','wifi'],['All settings','#39414b','gear']]}
+];
+const N = PAGES.length;
+const mod = i => ((i % N) + N) % N;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const D = {h:100, ic:80, g:44, t:40, max:7};
+const st = {p:0, sel:PAGES.map(() => 0), favs:['Netflix','YouTube','Plex','Live TV','PlayStation','Prime Video','Disney+'], moving:false};
+const ALL = {};
+PAGES.slice(1).forEach(pg => pg.items.forEach(it => { if (!ALL[it[0]]) ALL[it[0]] = it; }));
+const syncFavs = () => { st.favs = st.favs.filter(n => ALL[n]); PAGES[0].items = st.favs.map(n => ALL[n]); st.sel[0] = Math.min(st.sel[0], Math.max(0, PAGES[0].items.length - 1)); };
+const STAR = '<svg class="fav" viewBox="0 0 64 64"><path d="M32 6l7.6 16.4 18 2-13.4 12.2 3.8 17.7L32 45.2l-16 9.1 3.8-17.7L6.4 24.4l18-2z"/></svg>';
+
+function list(p, active){
+ const items = PAGES[p].items, sel = st.sel[p];
+ if (!items.length) return '<div class="more" style="font-size:30px">Press yellow on any app to add it here</div>';
+ const start = Math.max(0, Math.min(sel - D.max + 2, items.length - D.max));
+ const rows = items.slice(start, start + D.max).map((it, k) => {
+  const f = active && start + k === sel;
+  const fv = p !== 0 && st.favs.includes(it[0]);
+  return `<div class="r${f ? ' f' : ''}${f && st.moving ? ' mv' : ''}" style="height:${D.h}px"><span class="ic" style="width:${D.ic}px;height:${D.ic}px;background:${it[1]}"><svg viewBox="0 0 64 64" style="width:${D.g}px;height:${D.g}px">${G[it[2]]}</svg></span><span class="t" style="font-size:${D.t}px">${esc(it[0])}</span>${fv ? STAR : ''}</div>`;
+ }).join('');
+ const rest = items.length - start - D.max;
+ return `<div class="rows" style="gap:10px">${rows}${rest > 0 ? `<div class="more">+ ${rest} more</div>` : ''}</div>`;
+}
+function column(p, x, w, o){
+ return `<div class="col${o.mir ? ' mir' : ''}" style="left:${x}px;width:${w}px;opacity:${o.op};transform:scale(${o.sc})"><h3>${esc(PAGES[p].h)}</h3>${list(p, o.active)}</div>`;
+}
+function render(){
+ const W = 640, p = st.p;
+ let h = '<div class="clk">20:14 · Wed 25 Nov</div>';
+ [[-2,-1090,.5,.2],[2,1090,.5,.2],[-1,-680,.7,.45],[1,680,.7,.45]].forEach(([d, off, sc, op]) => {
+  h += column(mod(p + d), 960 - W/2 + off, W, {sc, op, mir: d < 0});
+ });
+ h += column(p, 960 - W/2, W, {sc:1, op:1, active:true});
+ h += '<div class="toast" id="toast"></div>';
+ document.getElementById('scr').innerHTML = h;
+ const cur = PAGES[p].items[st.sel[p]];
+ document.getElementById('out').textContent = `${PAGES[p].h}${cur ? ' · ' + cur[0] : ''}${st.moving ? ' · moving' : ''}`;
+}
+let tt;
+function toast(msg){
+ render();
+ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+ clearTimeout(tt); tt = setTimeout(() => { const x = document.getElementById('toast'); if (x) x.classList.remove('show'); }, 1800);
+}
+function move(k){
+ const items = PAGES[st.p].items, cur = items[st.sel[st.p]];
+ if (st.moving) {
+  const i = st.sel[0];
+  if (k === 'up' && i > 0) { [st.favs[i-1], st.favs[i]] = [st.favs[i], st.favs[i-1]]; st.sel[0]--; }
+  else if (k === 'down' && i < st.favs.length - 1) { [st.favs[i+1], st.favs[i]] = [st.favs[i], st.favs[i+1]]; st.sel[0]++; }
+  else if (k === 'ok' || k === 'red') { st.moving = false; syncFavs(); return toast('Order saved'); }
+  syncFavs(); return render();
+ }
+ if (k === 'yellow') {
+  if (!cur) return;
+  const n = cur[0], has = st.favs.includes(n);
+  if (st.p === 0 || has) { st.favs = st.favs.filter(x => x !== n); syncFavs(); return toast(st.p === 0 ? `${n} removed from favourites (still in its own page)` : `${n} removed from favourites`); }
+  st.favs.push(n); syncFavs(); return toast(`${n} added to favourites`);
+ }
+ if (k === 'red') {
+  if (st.p !== 0 || !cur) return toast('Go to favourites to reorder');
+  st.moving = true; return render();
+ }
+ if (k === 'left') st.p = mod(st.p - 1);
+ else if (k === 'right') st.p = mod(st.p + 1);
+ else if (k === 'up') st.sel[st.p] = Math.max(0, st.sel[st.p] - 1);
+ else if (k === 'down') st.sel[st.p] = Math.min(PAGES[st.p].items.length - 1, st.sel[st.p] + 1);
+ else if (k === 'ok') { const f = document.querySelector('#scr .r.f'); if (f) { f.classList.remove('flash'); void f.offsetWidth; f.classList.add('flash'); } return; }
+ render();
+}
+const tv = document.getElementById('tv');
+document.getElementById('bar').addEventListener('click', e => {
+ const b = e.target.closest('button'); if (!b) return;
+ if (b.dataset.k) move(b.dataset.k);
+ if (b.dataset.c) { document.getElementById('scr').classList.toggle('cb', b.dataset.c === 'b'); for (const x of document.querySelectorAll('[data-c]')) x.setAttribute('aria-pressed', String(x === b)); }
+});
+tv.addEventListener('click', () => tv.focus());
+tv.addEventListener('keydown', e => {
+ const k = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down', Enter:'ok', y:'yellow', Y:'yellow', r:'red', R:'red'}[e.key] || {403:'red', 405:'yellow'}[e.keyCode];
+ if (k) { e.preventDefault(); move(k); }
+});
+const fit = () => { document.getElementById('scr').style.transform = `scale(${tv.clientWidth / 1920})`; };
+const ro = new ResizeObserver(fit); ro.observe(tv);
+syncFavs(); render(); fit();
+}
+</script>
+</body>
+</html>

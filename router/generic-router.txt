@@ -1,0 +1,15 @@
+Ordinary home routers (no firewall rules)
+=========================================
+Most ISP routers can't block outbound DNS. Do as much of this as yours allows:
+
+1. Router > LAN / DHCP settings: Primary DNS = PIHOLE_IP and leave Secondary EMPTY
+   (a public secondary like 8.8.8.8 is a bypass: devices use it whenever they like).
+   If the router won't let you change DHCP DNS, turn its DHCP off and enable
+   Pi-hole's own DHCP server (Pi-hole > Settings > DHCP).
+2. On the TV: Settings > General > Network > (Wired/Wi-Fi) > Advanced > Edit:
+   untick "Set Automatically", enter a fixed IP, and DNS = PIHOLE_IP.
+3. IPv6: if the router has an IPv6 or "IPv6 DNS" setting, turn IPv6 off on the LAN, or set
+   its IPv6 DNS to the Pi-hole. Some TVs have an IPv6 switch in the same Advanced menu.
+4. Check from a computer: python3 tools/dns_check.py --dns PIHOLE_IP
+   Anything marked !! in parts 2-3 means a device *could* skip the Pi-hole; without router
+   rules that can't be fully closed, but with 1-3 done the TV has no reason to.

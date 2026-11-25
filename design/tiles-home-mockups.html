@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiles Home mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday: a design review you answer with a letter
+   IDEA a TV showroom wall: four sets side by side, each showing one direction for Tiles Home
+   PICTURE the four TV screens themselves, drawn at true 1920x1080 and scaled down, focus ring live
+   COLOUR one night palette in both themes: near-black room, white text, each screen keeps its own colours
+   TYPE Figtree 300 for the screens' big lowercase type, Figtree 400/600 for the page
+   LAYOUT title and how-to-answer across the top, then the screens in a 2x2 wall; one column under 900px */
+:root{color-scheme:dark;--bg:#0d0e11;--ink:#eef0f4;--dim:#9aa0ab;--line:#262932;--card:#15171c}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:16px/1.55 Figtree,system-ui,sans-serif;overflow-x:clip}
+.band{padding-block:clamp(24px,3.5vw,52px);padding-inline:max(4vw,16px)}
+.wrap{max-width:1500px;margin:0 auto}
+h1{font-size:clamp(30px,4vw,48px);font-weight:300;letter-spacing:-.02em;line-height:1.05;margin:0;text-wrap:balance}
+h2{font-size:26px;font-weight:600;letter-spacing:-.01em;margin:0;line-height:1.1}
+p{margin:8px 0;max-width:72ch}
+.top{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:32px;align-items:end}
+.top p{color:#c9cdd6}
+.shared{background:var(--card);border:1px solid var(--line);padding:14px 18px;font-size:15px}
+.shared b{display:block;margin-bottom:4px}
+.shared ul{margin:0;padding-left:18px}.shared li{margin:3px 0;color:#c9cdd6}
+.wall{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:36px 28px;margin-top:28px}
+.set{display:flex;flex-direction:column;gap:12px}
+.bezel{background:#000;padding:10px;border-radius:6px;box-shadow:0 0 0 1px #2b2e36}
+.tv{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000}
+.scr{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;font-family:Figtree,system-ui,sans-serif;color:#fff;overflow:hidden}
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:baseline}
+.letter{font-size:40px;font-weight:300;line-height:1;grid-row:span 2}
+.cap p{margin:0;color:#c9cdd6;font-size:15.5px}
+.pc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 20px;font-size:14.5px;color:#c9cdd6}
+.pc div::before{content:"+ ";color:#6fd3b8;font-weight:700}
+.pc div.c::before{content:"– ";color:#ff8a8a}
+.ask{margin-top:30px;background:var(--card);border:1px solid var(--line);padding:18px 20px}
+.ask code{background:#0b0c0f;border:1px solid var(--line);padding:2px 6px;font-size:14px}
+.note{font-size:13.5px;color:var(--dim);margin-top:14px}
+.tv:focus-visible{outline:3px solid #fff;outline-offset:4px}
+/* --- inside the screens (1920x1080 units) --- */
+.hd{position:absolute;left:110px;top:70px;right:110px;display:flex;justify-content:space-between;align-items:flex-end}
+.hd .t{font-weight:300;font-size:96px;letter-spacing:-2px;line-height:1}
+.hd .clk{font-weight:300;font-size:44px;opacity:.65}
+.grid{position:absolute;left:110px;top:240px;display:grid;grid-template-columns:repeat(12,168px);grid-template-rows:repeat(4,168px);gap:12px}
+.tl{position:relative;overflow:hidden;transition:transform .14s ease-out,box-shadow .14s ease-out;cursor:pointer}
+.tl .lb{position:absolute;left:16px;bottom:12px;right:16px;font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl.s .lb{font-size:17px;left:12px;bottom:9px}
+.tl .gl{position:absolute;inset:0;display:grid;place-items:center}
+.tl .gl svg{width:64px;height:64px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tl.m .gl svg{width:88px;height:88px}
+.tl .wm{font-size:40px;font-weight:600;letter-spacing:-.5px}
+.tl.s .wm{font-size:26px}
+.tl.f{transform:scale(1.05);z-index:2;box-shadow:0 0 0 5px #fff,0 18px 40px rgba(0,0,0,.6)}
+.ft{position:absolute;left:110px;bottom:46px;display:flex;gap:44px;font-size:22px;opacity:.7}
+.ft i{display:inline-block;width:18px;height:18px;margin-right:10px;vertical-align:-2px}
+.big{font-size:118px;font-weight:300;line-height:.92;letter-spacing:-3px}
+.sm{font-size:28px;font-weight:300;opacity:.85}
+.live{position:absolute;inset:0;padding:20px 24px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+.live .k{font-size:20px;opacity:.75}
+.live .v{font-size:40px;font-weight:300;line-height:1.05}
+.live .v.l{font-size:30px}
+/* B panorama */
+.pano{position:absolute;left:0;top:0;height:1080px;display:flex}
+.pano .hub{position:absolute;left:96px;top:10px;font-size:300px;font-weight:300;letter-spacing:-12px;line-height:1;opacity:.14;white-space:nowrap}
+.sec{position:relative;margin-top:300px;padding-left:110px;width:760px}
+.sec h3{margin:0 0 26px;font-size:64px;font-weight:300;letter-spacing:-1px;line-height:1}
+.row{display:flex;align-items:center;gap:22px;height:92px;font-size:36px;font-weight:300;cursor:pointer}
+.row .sq{width:80px;height:80px;flex:none;display:grid;place-items:center;font-size:30px;font-weight:600}
+.row.f{color:#7fe0d0}
+.row.f .sq{box-shadow:0 0 0 4px #fff}
+.row .sq svg{width:50px;height:50px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.row small{font-size:22px;opacity:.6;margin-left:auto;padding-right:20px}
+.sgrid{display:grid;grid-template-columns:repeat(3,168px);grid-auto-rows:168px;gap:12px}
+@media(max-width:900px){.top{grid-template-columns:minmax(0,1fr)}.wall{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.pc{grid-template-columns:minmax(0,1fr)}.letter{font-size:32px}}
+@media(prefers-reduced-motion:reduce){.tl{transition:none}}
+</style>
+</head>
+<body>
+<section class="band">
+ <div class="wrap">
+  <div class="top">
+   <div>
+    <h1>Four directions for Tiles Home, drawn at TV size</h1>
+    <p>Each screen is a 1920×1080 frame of your 43-inch TV, scaled down. Click a tile to move the focus ring and see how the selected state looks. Sample apps are shown as names. On the TV, Tiles Home uses each app's real icon.</p>
+   </div>
+   <div class="shared"><b>Fixed in every direction</b>
+    <ul>
+     <li>Safe margins of 110 px, so nothing is lost to overscan</li>
+     <li>One focus style: white ring, slight lift, no wobble</li>
+     <li>Real app icons in place of letters (a "Y" for YouTube)</li>
+     <li>The clock shows date and weekday, not only time</li>
+     <li>A colour-key hint bar that matches what the keys do</li>
+    </ul>
+   </div>
+  </div>
+
+  <div class="wall" id="wall"></div>
+
+  <div class="ask">
+   <h2>How to answer</h2>
+   <p>Reply with a letter, or mix them, and add anything to change. For example: <code>B, but with A's single colour</code> or <code>C without the Dev Mode tile</code>. I'll build the one you pick into the launcher and rebuild the .ipk.</p>
+   <p class="note">The status tiles in C (privacy settings, Developer Mode days) only work if the TV lets an app read those values. I'd check that on your firmware first. If it doesn't, the launcher would show them from the last time <code>lgtv_privacy.py</code> ran.</p>
+  </div>
+ </div>
+</section>
+
+<script>
+{
+const ic = {
+ tv:'<rect x="8" y="14" width="48" height="32" rx="3"/><path d="M24 54h16M32 46v8"/>',
+ hdmi:'<path d="M10 24h44v10l-6 8H16l-6-8z"/><path d="M18 30h28"/>',
+ folder:'<path d="M8 18h18l5 6h25v26H8z"/>',
+ globe:'<circle cx="32" cy="32" r="22"/><path d="M10 32h44M32 10c8 8 8 36 0 44M32 10c-8 8-8 36 0 44"/>',
+ gear:'<circle cx="32" cy="32" r="8"/><path d="M32 10v8M32 46v8M10 32h8M46 32h8M16.5 16.5l5.7 5.7M41.8 41.8l5.7 5.7M16.5 47.5l5.7-5.7M41.8 22.2l5.7-5.7"/>',
+ grid:'<rect x="12" y="12" width="16" height="16"/><rect x="36" y="12" width="16" height="16"/><rect x="12" y="36" width="16" height="16"/><rect x="36" y="36" width="16" height="16"/>',
+ music:'<path d="M24 46V16l26-5v30"/><circle cx="18" cy="46" r="6"/><circle cx="44" cy="41" r="6"/>',
+ shield:'<path d="M32 8l20 8v14c0 13-9 21-20 26C21 51 12 43 12 30V16z"/><path d="M23 32l6 6 12-13"/>',
+ cam:'<rect x="8" y="18" width="34" height="28" rx="3"/><path d="M42 28l14-8v24l-14-8"/>'
+};
+const svg = k => `<svg viewBox="0 0 64 64">${ic[k]}</svg>`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const now = new Date(2026, 10, 25, 20, 14);
+const T = '20:14', D = 'Wednesday 25 November';
+
+/* tile: [col,row,w,h,label,content,colour,textColour] content: g:<glyph> | w:<wordmark> | raw html */
+function body(t){
+ const c = t[5];
+ if (c.startsWith('g:')) return `<div class="gl">${svg(c.slice(2))}</div>`;
+ if (c.startsWith('w:')) return `<div class="gl"><span class="wm">${esc(c.slice(2))}</span></div>`;
+ return c;
+}
+function tiles(list, focus){
+ return list.map((t,i) => {
+  const sz = t[2]===1 ? 's' : 'm';
+  return `<div class="tl ${sz}${i===focus?' f':''}" style="grid-column:${t[0]}/span ${t[2]};grid-row:${t[1]}/span ${t[3]};background:${t[6]};color:${t[7]||'#fff'}">${body(t)}${t[4]&&!t[5].startsWith('w:')?`<span class="lb">${esc(t[4])}</span>`:''}</div>`;
+ }).join('');
+}
+const keys = (r,g,y,b) => `<div class="ft"><span><i style="background:#d33"></i>${r}</span><span><i style="background:#2a2"></i>${g}</span><span><i style="background:#dc2"></i>${y}</span><span><i style="background:#36d"></i>${b}</span></div>`;
+const clock = (bg) => `<div class="live"><div class="big">${T}</div><div class="sm">${D}</div></div>`;
+
+/* A: one accent */
+const acc = '#0e8a87';
+const A = `<div class="scr" style="background:#0c0d10">
+ <div class="hd"><span class="t">start</span><span class="clk">${T}</span></div>
+ <div class="grid">${tiles([
+  [1,1,4,2,'',clock(),acc],[5,1,2,2,'Live TV','g:tv',acc],[7,1,2,2,'Netflix','w:Netflix',acc],[9,1,2,2,'Music','g:music',acc],
+  [1,3,2,2,'YouTube','w:YouTube',acc],[3,3,1,1,'Prime','w:prime',acc],[4,3,1,1,'Disney+','w:D+',acc],[3,4,1,1,'PlayStation','g:hdmi',acc],[4,4,1,1,'HDMI 2','g:hdmi',acc],
+  [5,3,2,2,'Plex','w:Plex',acc],[7,3,1,1,'Media','g:folder',acc],[8,3,1,1,'Browser','g:globe',acc],[7,4,1,1,'Settings','g:gear',acc],[8,4,1,1,'All apps','g:grid',acc],[9,3,2,2,'Camera','g:cam',acc]
+ ],2)}</div>${keys('Customise','Pin app','All apps','Reset')}</div>`;
+
+/* B: panorama hub */
+const rowsB = [['N','Netflix','#b3123a','Resume'],['Y','YouTube','#c4302b',''],['P','Plex','#d9822b','2 new'],['L','Live TV','#1f5fbf','BBC One']];
+const B = `<div class="scr" style="background:linear-gradient(90deg,#0b2540,#0b1d33 60%,#0a1628)">
+ <div class="pano"><div class="hub">home · apps · inputs</div>
+  <div class="sec"><h3>watching</h3>${rowsB.map((r,i)=>`<div class="row${i===0?' f':''}"><span class="sq" style="background:${r[2]}">${r[0]}</span>${esc(r[1])}${r[3]?`<small>${esc(r[3])}</small>`:''}</div>`).join('')}
+   <div class="row" style="margin-top:20px;font-size:26px;opacity:.7">${T} · ${D}</div></div>
+  <div class="sec" style="width:640px"><h3>apps</h3><div class="sgrid">${tiles([
+   [1,1,1,1,'Prime','w:prime','#1f5fbf'],[2,1,1,1,'Disney+','w:D+','#3d2e9b'],[3,1,1,1,'Music','g:music','#1e9e4a'],
+   [1,2,1,1,'Media','g:folder','#b8740f'],[2,2,1,1,'Browser','g:globe','#15806e'],[3,2,1,1,'All apps','g:grid','#3d4650'],
+   [1,3,1,1,'Camera','g:cam','#6b3fb0'],[2,3,1,1,'Settings','g:gear','#3d4650']],-1)}</div></div>
+  <div class="sec" style="width:600px"><h3>inputs</h3>${[['PlayStation','HDMI 1'],['Laptop','HDMI 2'],['Antenna','Live TV']].map(r=>`<div class="row"><span class="sq" style="background:#13716d">${svg('hdmi')}</span>${esc(r[0])}<small>${esc(r[1])}</small></div>`).join('')}</div>
+ </div>${keys('Customise','Pin','Jump to section','Reset')}</div>`;
+
+/* C: live wall, colour by kind */
+const st = '#1f5fbf', red = '#b3123a', vio = '#5b34a6', tl = '#0e8a87', sl = '#39414b', am = '#c46f12', gr = '#178a43';
+const C = `<div class="scr" style="background:#101114">
+ <div class="hd"><span class="t">home</span><span class="clk">Good evening</span></div>
+ <div class="grid">${tiles([
+  [1,1,4,2,'',clock(),sl],
+  [5,1,2,2,'',`<div class="live"><div class="k">Last input</div><div class="v">PlayStation</div><div class="k">HDMI 1 · 2 h ago</div></div>`,tl],
+  [7,1,2,2,'Netflix','w:Netflix',red],[9,1,2,2,'YouTube','w:YouTube',red],
+  [1,3,2,2,'',`<div class="live"><div class="gl" style="position:static;place-items:start;margin-bottom:auto">${svg('shield')}</div><div class="v l">Live Plus off<br>Home ads off</div><div class="k">checked today 09:12</div></div>`,gr],
+  [3,3,2,1,'Prime Video','w:prime',st],[3,4,1,1,'Disney+','w:D+',vio],[4,4,1,1,'Plex','w:Plex',am],
+  [5,3,2,2,'',`<div class="live"><div class="k">Developer Mode</div><div class="v" style="font-size:72px">34 days</div><div class="k">auto-extends weekly</div></div>`,sl],
+  [7,3,1,1,'Live TV','g:tv',st],[8,3,1,1,'HDMI 2','g:hdmi',tl],[7,4,1,1,'Media','g:folder',am],[8,4,1,1,'All apps','g:grid',sl],[9,3,2,2,'Music','g:music',gr]
+ ],2)}</div>${keys('Customise','Pin app','All apps','Reset')}</div>`;
+
+/* D: quiet, colour only on focus */
+const dk = '#17181c';
+const D2 = `<div class="scr" style="background:#000">
+ <div class="hd" style="top:90px"><span class="t" style="font-size:64px;opacity:.85">${T}</span><span class="clk" style="font-size:30px">${D}</span></div>
+ <div class="grid" style="top:250px;grid-template-rows:repeat(4,168px);gap:24px;grid-template-columns:repeat(12,156px)">${tiles([
+  [1,1,2,2,'Netflix','w:Netflix','#2f6bff'],[3,1,2,2,'YouTube','w:YouTube',dk,'#cfd2d8'],[5,1,2,2,'Plex','w:Plex',dk,'#cfd2d8'],
+  [7,1,2,2,'Live TV','g:tv',dk,'#cfd2d8'],[9,1,2,2,'PlayStation','g:hdmi',dk,'#cfd2d8'],
+  [1,3,1,1,'Prime','w:prime',dk,'#cfd2d8'],[2,3,1,1,'Disney+','w:D+',dk,'#cfd2d8'],[3,3,1,1,'Music','g:music',dk,'#cfd2d8'],[4,3,1,1,'Media','g:folder',dk,'#cfd2d8'],
+  [5,3,1,1,'Browser','g:globe',dk,'#cfd2d8'],[6,3,1,1,'HDMI 2','g:hdmi',dk,'#cfd2d8'],[7,3,1,1,'Settings','g:gear',dk,'#cfd2d8'],[8,3,1,1,'All apps','g:grid',dk,'#cfd2d8']
+ ],0)}</div>${keys('Customise','Pin app','All apps','Reset')}</div>`;
+
+const sets = [
+ {l:'A', n:'Refined classic', s:A, d:'Today\'s layout, tidied: one accent colour for every tile, a big clock tile, a wall that scrolls sideways.', p:['Calm and uniform','Closest to what you have','Pick any accent colour'], c:['Apps are harder to tell apart at a glance']},
+ {l:'B', n:'Panorama hub', s:B, d:'Big lowercase sections side by side (watching, apps, inputs) that you scroll through, with the next one peeking in at the right.', p:['Most magazine-like','Text rows are quick to read from the sofa'], c:['More scrolling to reach inputs','Bigger change to build']},
+ {l:'C', n:'Live wall', s:C, d:'Colour by kind of app, plus live tiles: last input, your privacy settings, and days left on Developer Mode.', p:['Shows the kit is working','Last input is one press away'], c:['Busiest of the four','Status tiles depend on your firmware']},
+ {l:'D', n:'Quiet', s:D2, d:'Black screen, dark tiles, and colour only on the tile you have selected. Fewer, larger favourites up top.', p:['Easiest on the eyes at night','Nothing flashy on screen'], c:['Less playful','Small tiles get a little busy']}
+];
+const wall = document.getElementById('wall');
+wall.innerHTML = sets.map((x,i) => `<div class="set">
+  <div class="bezel"><div class="tv" id="tv${x.l}" tabindex="0" aria-label="Mockup ${x.l}: ${esc(x.n)}">${x.s}</div></div>
+  <div class="cap"><span class="letter">${x.l}</span><h2>${esc(x.n)}</h2><p>${esc(x.d)}</p></div>
+  <div class="pc">${x.p.map(t=>`<div>${esc(t)}</div>`).join('')}${x.c.map(t=>`<div class="c">${esc(t)}</div>`).join('')}</div>
+ </div>`).join('');
+
+const fit = () => { for (const tv of document.querySelectorAll('.tv')) { const k = tv.clientWidth / 1920; tv.firstElementChild.style.transform = `scale(${k})`; } };
+const ro = new ResizeObserver(fit); ro.observe(wall); fit();
+
+wall.addEventListener('click', e => {
+ const el = e.target.closest('.tl,.row'); if (!el || !el.closest('.scr')) return;
+ const scr = el.closest('.scr');
+ for (const f of scr.querySelectorAll('.f')) {
+  f.classList.remove('f');
+  if (scr.parentElement.id === 'tvD' && f.classList.contains('tl')) { f.style.background = '#17181c'; f.style.color = '#cfd2d8'; }
+ }
+ el.classList.add('f');
+ if (scr.parentElement.id === 'tvD' && el.classList.contains('tl')) { el.style.background = '#2f6bff'; el.style.color = '#fff'; }
+});
+}
+</script>
+</body>
+</html>

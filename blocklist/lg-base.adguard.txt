@@ -1,0 +1,40 @@
+! lg-base: LG ads, ACR, telemetry, home-screen promos.
+! Safe for streaming apps; disables LG Channels/home recommendation rows,
+! Live Plus, and LG ThinQ cloud features.
+! Source for tools/build_blocklists.py. One domain per line, '## ' starts a section,
+! 'regex: ' lines are Pi-hole regex / AdGuard /regex/ rules, '*.' blocks a domain and all subdomains.
+! Generated 2026-11-25 by tools/build_blocklists.py - edit src/base.txt
+||lgsmartad.com^
+||xlgsmartad.com^
+||lgads.tv^
+||alphonso.tv^
+||ads.lgtvcommon.com^
+||adts.lgtvcommon.com^
+||videoads.lgtvcommon.com^
+||cdpbeacon.lgtvcommon.com^
+||cdpbeacon2.lgtvcommon.com^
+||cdpsvc.lgtvcommon.com^
+||recommend.lgtvcommon.com^
+||thinqrecommend.lgtvcommon.com^
+||rdx2.lgtvsdp.com^
+||rdx2.nextlgsdp.com^
+||rdl.lgtvcommon.com^
+||wiseconfig.lgtvcommon.com^
+||homeprv.lgtvcommon.com^
+||nudge.lgtvcommon.com^
+||lgchhomeapp.lgtvcommon.com^
+||cdplauncher.lgtvcommon.com^
+||tv.wiselg.com^
+||elastic.lgwebostv.com^
+||lgrecommends.lgappstv.com^
+||lgtviot.com^
+||lss.lgthinq.com^
+||service.idsync.analytics.yahoo.com^
+||lgads.adsmeasurement.com^
+||aic-op-lss.lgthinq.com^
+||us.service.lgtvcommon.com^
+||smartshare.lgtvsdp.com^
+||lgad.cjpowercast.com.edgesuite.net^
+/^[a-z0-9]{2,3}-(ad|info)-lgsmartad-com\.aws-prd\.net$/
+/^[a-z0-9]{2,3}-rdx2-lgtvsdp-com\.aws-prd\.net$/
+/^([a-z]{2}\.)?(ad|info|ibs|ibis)\.lgappstv\.com$/

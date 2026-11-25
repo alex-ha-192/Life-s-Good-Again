@@ -1,0 +1,20 @@
+pfSense / OPNsense: TV-only rules
+=================================
+1. Services > DHCP Server > LAN: DNS servers = PIHOLE_IP (only that one).
+   Add a static mapping for the TV so it always gets TV_IP.
+
+2. Firewall > Aliases:
+     TV          Host(s)   TV_IP
+     PublicDNS   Host(s)   8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1 9.9.9.9 149.112.112.112
+                           208.67.222.222 208.67.220.220 94.140.14.14 94.140.15.15
+     DNSPorts    Port(s)   53 853
+
+3. Firewall > Rules > LAN, add at the TOP (above "Default allow LAN"):
+     Reject  IPv4+IPv6  TCP/UDP  source TV  dest any (not LAN net)  port DNSPorts   "TV: no DNS bypass"
+     Reject  IPv4+IPv6  any      source TV  dest PublicDNS                          "TV: no public resolvers / DoH"
+
+4. IPv6: Services > Router Advertisements (pfSense: DHCPv6 Server & RA) > LAN:
+   set the DNS server to the Pi-hole's IPv6 address, or untick "Use DNS from DHCPv6/RA" so only
+   IPv4 DNS (the Pi-hole) is used. Or turn IPv6 off on the TV if its menu offers it.
+
+Undo: delete the two rules and aliases, restore the DHCP DNS field.

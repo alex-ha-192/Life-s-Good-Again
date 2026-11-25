@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiles Home page layouts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday: a design review you drive with the remote's arrows
+   IDEA a showroom of TV sets, each running one way of laying out pages (left/right) and lists (up/down)
+   PICTURE the screens themselves at true 1920x1080, live: arrows move between pages and through each list
+   COLOUR one night palette in both themes; inside the screens, deep navy ground, white type, one teal for focus
+   TYPE Figtree 300 for the big lowercase page headers, 400/600 for everything else
+   LAYOUT the centred-column layout full width first, then four variants two by two; one column under 900px */
+:root{color-scheme:dark;--bg:#0d0e11;--ink:#eef0f4;--dim:#9aa0ab;--line:#262932;--card:#15171c;--acc:#2ec4b6}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:16px/1.55 Figtree,system-ui,sans-serif;overflow-x:clip}
+.band{padding-block:clamp(24px,3.5vw,48px);padding-inline:max(4vw,16px)}
+.wrap{max-width:1500px;margin:0 auto}
+h1{font-size:clamp(30px,4vw,46px);font-weight:300;letter-spacing:-.02em;line-height:1.05;margin:0;text-wrap:balance}
+h2{font-size:24px;font-weight:600;margin:0;line-height:1.15}
+p{margin:8px 0;max-width:74ch}
+.top{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:32px;align-items:end}
+.top p{color:#c9cdd6}
+.keys{background:var(--card);border:1px solid var(--line);padding:14px 18px;font-size:15px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px}
+.keys kbd{font:600 14px Figtree,sans-serif;background:#0b0c0f;border:1px solid #3a3e48;padding:2px 8px;white-space:nowrap;text-align:center}
+.keys span{color:#c9cdd6}
+.wall{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:40px 28px;margin-top:30px}
+.set{display:flex;flex-direction:column;gap:12px}
+.set.hero{grid-column:1/-1}
+.bezel{background:#000;padding:10px;border-radius:6px;box-shadow:0 0 0 1px #2b2e36}
+.tv{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000;outline:none}
+.tv:focus-visible{box-shadow:0 0 0 3px var(--acc)}
+.scr{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;color:#fff;overflow:hidden;font-family:Figtree,system-ui,sans-serif;background:radial-gradient(120% 90% at 50% 0%,#14315a,#0a1830 55%,#060d1c)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.bar button{font:600 15px Figtree,sans-serif;color:var(--ink);background:#1b1e25;border:1px solid #343844;min-width:48px;min-height:44px;padding:0 12px;cursor:pointer}
+.bar button:hover{background:#252a33}
+.bar button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.bar output{color:var(--dim);font-size:14.5px;margin-left:6px}
+.cap{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 14px;align-items:baseline}
+.letter{font-size:40px;font-weight:300;line-height:1;grid-row:span 2}
+.cap p{margin:0;color:#c9cdd6;font-size:15.5px}
+.dirs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;font-size:14px}
+.dirs div{background:var(--card);border:1px solid var(--line);padding:8px 10px;color:#c9cdd6}
+.dirs b{display:block;color:var(--ink);font-weight:600}
+.hero .dirs{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ask{margin-top:34px;background:var(--card);border:1px solid var(--line);padding:18px 20px}
+.ask code{background:#0b0c0f;border:1px solid var(--line);padding:2px 6px;font-size:14px}
+/* --- inside the screens --- */
+.clk{position:absolute;right:110px;top:64px;font-size:38px;font-weight:300;opacity:.7}
+.col{position:absolute;top:150px;transition:transform .28s ease-out,opacity .28s ease-out,left .28s ease-out;transform-origin:50% 0}
+.col h3{margin:0 0 30px;font-size:84px;font-weight:300;letter-spacing:-2px;line-height:1;white-space:nowrap}
+.col .rows{display:flex;flex-direction:column;gap:10px}
+.r{display:flex;align-items:center;gap:24px;height:100px;padding:0 20px 0 14px;border-radius:2px}
+.r .ic{width:72px;height:72px;flex:none;display:grid;place-items:center;font-size:28px;font-weight:700}
+.r .ic svg{width:42px;height:42px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.r .tx{display:flex;flex-direction:column;min-width:0}
+.r .t{font-size:38px;font-weight:300;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r .s{font-size:23px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r.f{background:rgba(255,255,255,.12)}
+.r.f .ic{box-shadow:0 0 0 4px #fff}
+.r.f .t{color:#8ff0e3}
+.col.mir{text-align:right}
+.col.mir .r{flex-direction:row-reverse;padding:0 14px 0 20px}
+.col.mir .tx{align-items:flex-end}
+.col.mir .more{text-align:right}
+.more{font-size:24px;opacity:.5;padding:8px 14px}
+.hint{position:absolute;bottom:52px;left:110px;right:110px;display:flex;justify-content:space-between;font-size:26px;opacity:.55}
+.pivot{position:absolute;left:110px;top:110px;display:flex;gap:56px;white-space:nowrap;transition:transform .28s ease-out}
+.pivot span{font-size:92px;font-weight:300;letter-spacing:-2px;line-height:1;opacity:.32}
+.pivot span.on{opacity:1}
+.preview{position:absolute;right:110px;top:300px;width:620px;height:620px;display:flex;flex-direction:column;justify-content:flex-end;padding:34px;gap:6px}
+.preview .pt{font-size:56px;font-weight:300;line-height:1.05}
+.preview .ps{font-size:26px;opacity:.8}
+.preview svg{position:absolute;left:34px;top:34px;width:120px;height:120px;fill:none;stroke:#fff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.hub{position:absolute;top:800px;font-size:260px;font-weight:300;letter-spacing:-10px;line-height:1;opacity:.07;white-space:nowrap;transition:left .4s ease-out}
+.dots{position:absolute;left:50%;bottom:60px;transform:translateX(-50%);display:flex;gap:16px}
+.dots i{width:14px;height:14px;border-radius:50%;background:#fff;opacity:.3}
+.dots i.on{opacity:1}
+@media(max-width:900px){.top{grid-template-columns:minmax(0,1fr)}.wall{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.dirs,.hero .dirs{grid-template-columns:repeat(2,minmax(0,1fr))}.letter{font-size:32px}}
+@media(prefers-reduced-motion:reduce){.col,.pivot,.hub{transition:none}}
+</style>
+</head>
+<body>
+<section class="band">
+ <div class="wrap">
+  <div class="top">
+   <div>
+    <h1>Pages side to side, lists top to bottom: five ways to lay them out</h1>
+    <p>Each header is a page. Left and right move between pages, and up and down move through the list on the current page. Every screen below is a working 1920×1080 frame of your TV. Click a screen and use your arrow keys, or use the buttons under it. All five use the same five pages and the same sample apps.</p>
+   </div>
+   <div class="keys">
+    <kbd>← →</kbd><span>previous / next page</span>
+    <kbd>↑ ↓</kbd><span>move through the list; each page remembers its place</span>
+    <kbd>OK</kbd><span>open (shown here as a short flash)</span>
+   </div>
+  </div>
+  <div class="wall" id="wall"></div>
+  <div class="ask">
+   <h2>What I need from you</h2>
+   <p>Pick a letter and anything to change. For example: <code>A, but sides fully visible</code>, <code>A with C's two pages each side</code>, or <code>D, no preview panel</code>. Also tell me whether paging should <b>wrap around</b> (after settings comes watching again) or <b>stop at the ends</b>. A, C and D wrap here; B and E stop. I'll then build it into Tiles Home with your real apps and icons, and keep the colour-key editing.</p>
+  </div>
+ </div>
+</section>
+
+<script>
+{
+const G = {
+ tv:'<rect x="8" y="14" width="48" height="32" rx="3"/><path d="M24 54h16M32 46v8"/>',
+ hdmi:'<path d="M10 24h44v10l-6 8H16l-6-8z"/><path d="M18 30h28"/>',
+ folder:'<path d="M8 18h18l5 6h25v26H8z"/>',
+ globe:'<circle cx="32" cy="32" r="22"/><path d="M10 32h44M32 10c8 8 8 36 0 44M32 10c-8 8-8 36 0 44"/>',
+ gear:'<circle cx="32" cy="32" r="8"/><path d="M32 10v8M32 46v8M10 32h8M46 32h8M16.5 16.5l5.7 5.7M41.8 41.8l5.7 5.7M16.5 47.5l5.7-5.7M41.8 22.2l5.7-5.7"/>',
+ music:'<path d="M24 46V16l26-5v30"/><circle cx="18" cy="46" r="6"/><circle cx="44" cy="41" r="6"/>',
+ shield:'<path d="M32 8l20 8v14c0 13-9 21-20 26C21 51 12 43 12 30V16z"/><path d="M23 32l6 6 12-13"/>',
+ cam:'<rect x="8" y="18" width="34" height="28" rx="3"/><path d="M42 28l14-8v24l-14-8"/>',
+ photo:'<rect x="8" y="12" width="48" height="40" rx="3"/><circle cx="22" cy="26" r="5"/><path d="M8 46l16-14 12 10 8-6 12 10"/>',
+ wifi:'<path d="M8 26c14-12 34-12 48 0M16 34c9-8 23-8 32 0M24 42c5-4 11-4 16 0"/><circle cx="32" cy="50" r="2"/>',
+ sound:'<path d="M10 26h10l12-10v32L20 38H10z"/><path d="M42 24c4 4 4 12 0 16M48 18c8 8 8 20 0 28"/>',
+ pic:'<rect x="8" y="12" width="48" height="34" rx="3"/><path d="M8 40l14-12 10 8 10-6 14 10"/>',
+ code:'<path d="M24 20L12 32l12 12M40 20l12 12-12 12"/>',
+ usb:'<rect x="22" y="8" width="20" height="16"/><rect x="16" y="24" width="32" height="32" rx="3"/>',
+ grid:'<rect x="12" y="12" width="16" height="16"/><rect x="36" y="12" width="16" height="16"/><rect x="12" y="36" width="16" height="16"/><rect x="36" y="36" width="16" height="16"/>'
+};
+/* each item: [title, secondary, colour, glyph or letter] */
+const PAGES = [
+ {h:'watching', items:[['Netflix','Resume: episode 4, 23 min left','#b3123a','N'],['YouTube','3 new from subscriptions','#c4302b','Y'],['Plex','2 new episodes','#c76f12','P'],['Live TV','BBC One, now','#1f5fbf','g:tv'],['PlayStation','HDMI 1, used 2 h ago','#13716d','g:hdmi'],['Prime Video','Continue film, 1 h 10 left','#1f5fbf','P']]},
+ {h:'apps', items:[['Netflix','','#b3123a','N'],['YouTube','','#c4302b','Y'],['Prime Video','','#1f5fbf','P'],['Disney+','','#3d2e9b','D'],['Plex','','#c76f12','P'],['Music','','#178a43','g:music'],['Browser','','#15806e','g:globe'],['Camera','','#6b3fb0','g:cam'],['All apps','28 installed','#39414b','g:grid']]},
+ {h:'inputs', items:[['PlayStation','HDMI 1','#13716d','g:hdmi'],['Laptop','HDMI 2','#13716d','g:hdmi'],['HDMI 3','Nothing connected','#39414b','g:hdmi'],['Antenna','Live TV','#1f5fbf','g:tv'],['USB drive','64 GB, 412 files','#c76f12','g:usb']]},
+ {h:'media', items:[['Photos','USB drive, 318 photos','#6b3fb0','g:photo'],['Films','Plex library, 140','#c76f12','g:folder'],['TV shows','Plex library, 37','#c76f12','g:folder'],['Music','Plex library, 2,104 tracks','#178a43','g:music']]},
+ {h:'settings', items:[['Picture','Filmmaker mode','#39414b','g:pic'],['Sound','TV speaker','#39414b','g:sound'],['Privacy','Live Plus off, home ads off','#178a43','g:shield'],['Developer Mode','34 days left, extends weekly','#39414b','g:code'],['Network','Wired, 192.168.1.50','#39414b','g:wifi'],['All settings','Opens LG settings','#39414b','g:gear']]}
+];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ic = g => g.startsWith('g:') ? `<svg viewBox="0 0 64 64">${G[g.slice(2)]}</svg>` : esc(g);
+const N = PAGES.length;
+const mod = i => ((i % N) + N) % N;
+
+function list(p, sel, max, active){
+ const items = PAGES[p].items;
+ const start = Math.max(0, Math.min(sel - max + 2, items.length - max));
+ const shown = items.slice(start, start + max);
+ const rows = shown.map((it, k) => {
+  const f = active && start + k === sel;
+  return `<div class="r${f?' f':''}"><span class="ic" style="background:${it[2]}">${ic(it[3])}</span><span class="tx"><span class="t">${esc(it[0])}</span>${it[1]?`<span class="s">${esc(it[1])}</span>`:''}</span></div>`;
+ }).join('');
+ const more = items.length > start + max ? `<div class="more">+ ${items.length - start - max} more</div>` : '';
+ return `<div class="rows">${rows}${more}</div>`;
+}
+function column(p, x, w, sel, opts){
+ const o = Object.assign({scale:1, op:1, active:false, max:6, mir:false}, opts);
+ return `<div class="col${o.mir?' mir':''}" style="left:${x}px;width:${w}px;opacity:${o.op};transform:scale(${o.scale})"><h3>${esc(PAGES[p].h)}</h3>${list(p, sel, o.max, o.active)}</div>`;
+}
+const clock = '<div class="clk">20:14 · Wed 25 Nov</div>';
+
+const LAYOUTS = [
+ {l:'A', n:'Centred column, neighbours peeking', wrap:true, hero:true,
+  d:'The current page sits in the middle at full size. The pages to the left and right are cut by the screen edge and dimmed, so you can read their headers and first rows but they never compete.',
+  dirs:[['←','previous page slides in from the left'],['→','next page slides in from the right'],['↑ ↓','list in the middle column'],['Edges','wraps: settings ← watching → apps']],
+  draw:(s) => { const p = s.p, W = 760, cx = 960 - W/2, gap = 90;
+   return clock + column(mod(p-1), cx - W - gap, W, s.sel[mod(p-1)], {op:.36, mir:true}) + column(p, cx, W, s.sel[p], {active:true}) + column(mod(p+1), cx + W + gap, W, s.sel[mod(p+1)], {op:.36})
+    + `<div class="dots">${PAGES.map((_,i)=>`<i class="${i===p?'on':''}"></i>`).join('')}</div>`; }},
+ {l:'B', n:'Centred column, neighbours fully visible', wrap:false,
+  d:'Three pages on screen at once. The middle one is wider and bright, and the side pages are complete but smaller and dimmed.',
+  dirs:[['←','left page moves to the middle'],['→','right page moves to the middle'],['↑ ↓','middle list'],['Edges','stops: first and last page leave one side empty']],
+  draw:(s) => { const p = s.p; let h = clock;
+   if (p > 0) h += column(p-1, 110, 560, s.sel[p-1], {op:.4, scale:.82, max:6, mir:true});
+   h += column(p, 680, 560, s.sel[p], {active:true});
+   if (p < N-1) h += column(p+1, 1250, 560, s.sel[p+1], {op:.4, scale:.82, max:6});
+   return h; }},
+ {l:'C', n:'Centred column, two pages each side', wrap:true,
+  d:'A ring of five pages. The nearest neighbours are shrunk and faded, and the outer two are just visible at the edges, so you can see the whole menu without moving.',
+  dirs:[['←','ring turns right'],['→','ring turns left'],['↑ ↓','middle list'],['Edges','wraps: it is a ring']],
+  draw:(s) => { const p = s.p, W = 640; let h = clock;
+   [[-2,-1010,.5,.16],[2,1010,.5,.16],[-1,-600,.7,.4],[1,600,.7,.4]].forEach(([d,off,sc,op]) => { h += column(mod(p+d), 960 - W/2 + off, W, s.sel[mod(p+d)], {scale:sc, op:op, mir:d<0}); });
+   return h + column(p, 960 - W/2, W, s.sel[p], {active:true}); }},
+ {l:'D', n:'Header strip with preview', wrap:true,
+  d:'All page headers sit in one row across the top: the current one is bright, the rest are dimmed and run off the right edge. The list sits on the left, and a large preview of the selected item fills the right.',
+  dirs:[['←','headers shift right, previous page'],['→','headers shift left, next page'],['↑ ↓','list; preview follows'],['Edges','wraps, headers cycle']],
+  draw:(s) => { const p = s.p, it = PAGES[p].items[s.sel[p]];
+   const order = [0,1,2,3,4,5,6].map(k => mod(p + k));
+   const pv = `<div class="preview" style="background:${it[2]}">${it[3].startsWith('g:') ? ic(it[3]) : `<svg viewBox="0 0 64 64"><text x="6" y="54" font-size="56" font-family="Figtree" font-weight="700" fill="#fff" stroke="none">${esc(it[3])}</text></svg>`}<div class="pt">${esc(it[0])}</div>${it[1]?`<div class="ps">${esc(it[1])}</div>`:''}</div>`;
+   return `<div class="pivot">${order.map((i,k)=>`<span class="${k===0?'on':''}">${esc(PAGES[i].h)}</span>`).join('')}</div>`
+    + `<div class="col" style="left:110px;top:300px;width:1000px">${list(p, s.sel[p], 6, true)}</div>` + pv; }},
+ {l:'E', n:'Left-aligned, next page peeking', wrap:false,
+  d:'The current page sits on the left and the next one takes up the right third, cut by the edge. A large faint title behind slides more slowly than the pages, for a sense of depth.',
+  dirs:[['←','back one page (left is empty)'],['→','next page slides over'],['↑ ↓','left list'],['Edges','stops at each end']],
+  draw:(s) => { const p = s.p;
+   let h = `<div class="hub" style="left:${80 - p*300}px">${PAGES.map(x=>esc(x.h)).join(' · ')}</div>` + clock;
+   h += column(p, 110, 860, s.sel[p], {active:true});
+   if (p < N-1) h += column(p+1, 1110, 860, s.sel[p+1], {op:.42});
+   return h; }}
+];
+
+const wall = document.getElementById('wall');
+wall.innerHTML = LAYOUTS.map((L,i) => `<div class="set${L.hero?' hero':''}">
+  <div class="bezel"><div class="tv" id="tv${L.l}" tabindex="0" role="application" aria-label="Mockup ${L.l}, ${esc(L.n)}. Use arrow keys."><div class="scr"></div></div></div>
+  <div class="bar" data-i="${i}">
+   <button data-k="left" aria-label="Previous page">←</button><button data-k="up" aria-label="Up">↑</button><button data-k="down" aria-label="Down">↓</button><button data-k="right" aria-label="Next page">→</button><button data-k="ok">OK</button>
+   <output id="out${L.l}"></output>
+  </div>
+  <div class="cap"><span class="letter">${L.l}</span><h2>${esc(L.n)}</h2><p>${esc(L.d)}</p></div>
+  <div class="dirs">${L.dirs.map(d=>`<div><b>${esc(d[0])}</b>${esc(d[1])}</div>`).join('')}</div>
+ </div>`).join('');
+
+const state = LAYOUTS.map((L) => ({p: L.l === 'B' || L.l === 'E' ? 1 : 0, sel: PAGES.map(() => 0)}));
+state[0].sel[0] = 0;
+
+function render(i){
+ const L = LAYOUTS[i], s = state[i];
+ const tv = document.getElementById('tv' + L.l);
+ tv.firstElementChild.innerHTML = L.draw(s);
+ const it = PAGES[s.p].items[s.sel[s.p]];
+ document.getElementById('out' + L.l).textContent = `Page ${s.p + 1} of ${N}: ${PAGES[s.p].h} · ${it[0]}`;
+}
+function move(i, k){
+ const L = LAYOUTS[i], s = state[i];
+ if (k === 'left' || k === 'right') {
+  const n = s.p + (k === 'right' ? 1 : -1);
+  if (L.wrap) s.p = mod(n); else if (n >= 0 && n < N) s.p = n;
+ } else if (k === 'up') s.sel[s.p] = Math.max(0, s.sel[s.p] - 1);
+ else if (k === 'down') s.sel[s.p] = Math.min(PAGES[s.p].items.length - 1, s.sel[s.p] + 1);
+ else if (k === 'ok') {
+  const f = document.querySelector('#tv' + L.l + ' .r.f, #tv' + L.l + ' .preview');
+  if (f) { f.animate([{filter:'brightness(1.8)'},{filter:'brightness(1)'}], {duration:280}); }
+  return;
+ }
+ render(i);
+}
+wall.addEventListener('click', e => {
+ const b = e.target.closest('button[data-k]');
+ if (b) { move(+b.parentElement.dataset.i, b.dataset.k); return; }
+ const tv = e.target.closest('.tv'); if (tv) tv.focus();
+});
+wall.addEventListener('keydown', e => {
+ const tv = e.target.closest('.tv'); if (!tv) return;
+ const k = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down', Enter:'ok'}[e.key];
+ if (!k) return;
+ e.preventDefault();
+ move(LAYOUTS.findIndex(L => 'tv' + L.l === tv.id), k);
+});
+
+const fit = () => { for (const tv of document.querySelectorAll('.tv')) tv.firstElementChild.style.transform = `scale(${tv.clientWidth / 1920})`; };
+const ro = new ResizeObserver(fit); ro.observe(wall);
+LAYOUTS.forEach((_, i) => render(i));
+state[0].sel[1] = 2; state[2].sel[2] = 1; state[3].sel[0] = 1;
+LAYOUTS.forEach((_, i) => render(i));
+fit();
+}
+</script>
+</body>
+</html>

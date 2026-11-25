@@ -1,0 +1,51 @@
+#!/bin/sh
+# OPTIONAL - ROOTED TVs ONLY (Homebrew Channel installed with root).
+# Homebrew Channel runs every script in /var/lib/webosbrew/init.d/ at boot.
+#
+# What this does, each boot:
+#   1. If /var/lib/webosbrew/lg-block.hosts exists and looks sane, bind-mounts
+#      a copy of /etc/hosts with those entries appended (on-TV DNS blocking,
+#      works even when the TV is away from your Pi-hole).
+#   2. Waits for the app manager, then opens Tiles Home.
+#
+# Nothing is written to the read-only system partition. To undo: delete this
+# file and reboot. If anything looks wrong it does nothing.
+#
+# Install (over SSH as root):
+#   cp 50-tiles-home /var/lib/webosbrew/init.d/ && chmod 755 /var/lib/webosbrew/init.d/50-tiles-home
+#   cp lg-base.hosts /var/lib/webosbrew/lg-block.hosts        # optional
+
+APP=io.github.lgprivacykit.tiles
+BLOCK=/var/lib/webosbrew/lg-block.hosts
+MERGED=/tmp/hosts.tiles-home
+LOG=/tmp/tiles-home-boot.log
+
+exec >>"$LOG" 2>&1
+echo "== $(date) tiles-home boot hook"
+
+# --- 1. hosts blocklist -----------------------------------------------------
+if [ -s "$BLOCK" ]; then
+    bad=$(grep -v -E '^(#.*|[[:space:]]*|0\.0\.0\.0[[:space:]]+[A-Za-z0-9.-]+)$' "$BLOCK" | head -n1)
+    if [ -n "$bad" ]; then
+        echo "blocklist has an unexpected line, skipping: $bad"
+    elif ! grep -q "tiles-home" /proc/mounts 2>/dev/null && ! mount | grep -q " /etc/hosts "; then
+        { cat /etc/hosts; echo "# --- tiles-home blocklist ---"; cat "$BLOCK"; } > "$MERGED"
+        chmod 644 "$MERGED"
+        mount --bind "$MERGED" /etc/hosts && echo "hosts blocklist active ($(grep -c '^0' "$BLOCK") entries)"
+    else
+        echo "/etc/hosts already bind-mounted, leaving it"
+    fi
+fi
+
+# --- 2. open the launcher after boot ----------------------------------------
+(
+    i=0
+    while [ $i -lt 60 ]; do
+        if luna-send -n 1 -w 2000 luna://com.webos.applicationManager/running '{}' 2>/dev/null | grep -q returnValue; then
+            break
+        fi
+        i=$((i + 1)); sleep 2
+    done
+    sleep 8   # let LG's own startup finish
+    luna-send -n 1 luna://com.webos.applicationManager/launch "{\"id\":\"$APP\"}" && echo "launched $APP"
+) &

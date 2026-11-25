@@ -1,0 +1,14 @@
+[Unit]
+Description=Extend LG webOS Developer Mode session when due
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Edit the path. Install as a *user* unit (see GUIDE.html) so it reads your pairing
+# from ~/.config/lgtv-privacy. `lgtv_devmode.py schedule` prints a version with
+# your real paths filled in.
+ExecStart=/usr/bin/python3 /opt/lgkit/lgtv_devmode.py renew --polite
+# 75 = TV off / busy, will retry next run. 2 = overdue, shows as failed.
+SuccessExitStatus=75
+TimeoutStartSec=120

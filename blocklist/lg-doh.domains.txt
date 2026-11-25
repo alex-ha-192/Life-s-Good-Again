@@ -1,0 +1,15 @@
+# lg-doh: well-known DNS-over-HTTPS hostnames. Precaution: there's no public report of LG's
+# own software using DoH, but apps on the TV could. Apply to the TV ONLY (Pi-hole group or
+# AdGuard $client): on your whole network it would also switch off DoH in browsers that rely on it.
+# Generated 2026-11-25 by tools/build_blocklists.py - edit src/doh.txt
+
+dns.google.com
+one.one.one.one
+doh.opendns.com
+dns.mullvad.net
+dns.google
+cloudflare-dns.com
+dns.quad9.net
+dns.nextdns.io
+adguard-dns.com
+doh.cleanbrowsing.org

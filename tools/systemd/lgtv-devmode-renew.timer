@@ -1,0 +1,10 @@
+[Unit]
+Description=Every 3 hours: extend LG Developer Mode if due (acts about once a week)
+
+[Timer]
+OnCalendar=*-*-* 00/3:17:00
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
