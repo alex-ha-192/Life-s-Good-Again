@@ -92,8 +92,9 @@ function toast(msg) {
 
 // ------------------------------------------------------------------ launching Tiles Home
 var lastLaunch = 0;
-function launchTiles(reason) {
-  if (Date.now() - lastLaunch < 1500) return; // debounce
+function launchTiles(reason, force) {
+  // debounce repeats, except when LG Home has actually come up: then Tiles must go back on top
+  if (!force && Date.now() - lastLaunch < 1500) return;
   lastLaunch = Date.now();
   luna("luna://com.webos.applicationManager/launch", { id: APP }, function (r) {
     if (r.returnValue === false) log("launch failed (" + reason + "): " + (r.errorText || "?"));
@@ -113,7 +114,9 @@ function onForeground(appId) {
     log("LG Home opened from Tiles Home, leaving it");
     return;
   }
-  setTimeout(function () { launchTiles("LG Home came up: " + appId); }, 250);
+  launchTiles("LG Home came up: " + appId, true);
+  // close LG's Home behind Tiles so it isn't left running (and can't reappear on Back)
+  setTimeout(function () { luna("luna://com.webos.applicationManager/closeByAppId", { id: appId }, function () {}); }, 1500);
 }
 function watchForeground() {
   var p = subscribe("luna://com.webos.applicationManager/getForegroundAppInfo", { subscribe: true });
@@ -151,7 +154,7 @@ function watchKeys() {
           if (type === 1 && value === 1 && code === HOME_CODE) {
             lastHomeKey = Date.now();
             if (!status.homeKeySeen) { status.homeKeySeen = true; saveStatus(); }
-            if (REDIRECT_HOME) setTimeout(function () { launchTiles("Home button"); }, 350);
+            if (REDIRECT_HOME) launchTiles("Home button");   // at once: beats most of LG Home's animation
           }
         }
         setImmediate(read);
@@ -163,7 +166,7 @@ function watchKeys() {
 
 // ------------------------------------------------------------------ power-on / wake
 function onPowerOn(reason) {
-  if (BOOT_TO_TILES) setTimeout(function () { launchTiles(reason); }, 3000);
+  if (BOOT_TO_TILES) setTimeout(function () { launchTiles(reason); }, reason === "boot" ? 3000 : 600);
   setTimeout(function () { guard(); }, 60000);
 }
 function watchPower() {

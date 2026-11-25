@@ -11,8 +11,20 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 #ring { position: absolute; inset: 0; }
-.col { position: absolute; top: 60px; width: 640px; transform-origin: 50% 0;
-  transition: left .28s ease-out, transform .28s ease-out, opacity .28s ease-out; cursor: pointer; }
+/* Motion: Metro-style ease (fast out, long settle). Only transform and opacity animate, which the
+   TV composites on the GPU. Pages slide round the ring; the arriving page's rows come in one by one. */
+.col { position: absolute; top: 60px; width: 640px; transform-origin: 50% 0; will-change: transform, opacity;
+  transition: transform .42s cubic-bezier(.1,.9,.2,1), opacity .32s ease-out; cursor: pointer; }
+.col.jump { transition: none; }
+.r { transition: background-color .16s ease-out, box-shadow .16s ease-out; }
+.ic { transition: box-shadow .16s ease-out, transform .16s ease-out; }
+.r.f .ic { transform: scale(1.04); }
+.in { animation: rowin .38s cubic-bezier(.1,.9,.2,1) both; }
+@keyframes rowin { from { opacity: 0; transform: translateX(46px); } to { opacity: 1; transform: none; } }
+.mir .in { animation-name: rowinr; }
+@keyframes rowinr { from { opacity: 0; transform: translateX(-46px); } to { opacity: 1; transform: none; } }
+#ring.boot h2 { animation: rise .55s cubic-bezier(.1,.9,.2,1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
 .col h2 { font-size: 80px; font-weight: 300; letter-spacing: -2px; line-height: 1; margin-bottom: 26px; white-space: nowrap; }
 .rows { display: flex; flex-direction: column; gap: 10px; }
 .r { display: flex; align-items: center; gap: 26px; height: 100px; padding: 0 18px 0 12px; }
@@ -25,16 +37,24 @@ html, body {
 .r.f { background: rgba(255,255,255,.13); }
 .r.f .ic { box-shadow: 0 0 0 4px #fff; }
 .r.f .t { font-weight: 400; }
-.r.mv { background: rgba(46,196,182,.22); box-shadow: inset 0 0 0 3px #2ec4b6; }
+.r.mv { background: rgba(46,196,182,.22); box-shadow: inset 0 0 0 3px #2ec4b6; animation: lift .9s ease-in-out infinite alternate; }
+@keyframes lift { from { transform: translateX(0); } to { transform: translateX(10px); } }
 .mir { text-align: right; }
 .mir .r { flex-direction: row-reverse; padding: 0 12px 0 18px; }
 .mir .fav { order: -1; }
 .more { font-size: 24px; opacity: .5; padding: 10px 14px; }
 .empty { font-size: 30px; opacity: .6; padding: 10px 14px; white-space: normal; }
 #clock { position: absolute; right: 110px; bottom: 50px; font-size: 36px; font-weight: 300; opacity: .7; }
-#toast { position: absolute; left: 630px; width: 660px; bottom: 50px; text-align: center; padding: 18px 28px;
-  background: #0f1a2e; border: 2px solid #2ec4b6; font-size: 30px; opacity: 0; transform: translateY(16px);
+#toast { position: absolute; left: 630px; width: 660px; z-index: 2; bottom: 50px; text-align: center; padding: 18px 28px;
+  background: #0f1a2e; border: 2px solid #2ec4b6; font-size: 30px; margin-bottom: 70px; opacity: 0; transform: translateY(16px);
   transition: opacity .2s, transform .2s; pointer-events: none; }
 #toast.show { opacity: 1; transform: none; }
-.flash { animation: fl .3s ease-out; }
-@keyframes fl { from { filter: brightness(1.9); } to { filter: none; } }
+.flash { animation: fl .32s ease-out; }
+@keyframes fl { 0% { transform: scale(.97); filter: brightness(1.8); } 100% { transform: none; filter: none; } }
+#hints { position: absolute; left: 110px; bottom: 50px; font-size: 28px; font-weight: 300; opacity: .78;
+  display: flex; align-items: center; white-space: nowrap; }
+#hints b { font-weight: 600; margin-right: 8px; }
+#hints .k { display: inline-block; width: 26px; height: 26px; border-radius: 50%; margin-right: 10px; vertical-align: -4px; }
+#hints .k.y { background: #f2c400; }
+#hints .k.r { background: #e0323e; }
+#hints .sep { display: inline-block; width: 44px; }

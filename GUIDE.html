@@ -224,7 +224,16 @@ mkdir -p /tmp/kit &amp;&amp; tar -xzf /tmp/lgkit-root.tar.gz -C /tmp/kit &amp;&a
       <tr><td data-l="Remote"><b>Pointer</b></td><td data-l="Does">Click a side page to turn to it; click a row once to select it and again to open it.</td></tr>
      </tbody>
     </table></div>
+  <p>The bottom left of the screen always shows what the buttons do right now. For example, it shows <i>yellow: add to favourites</i> or <i>remove from favourites</i> for the selected item, <i>red: move</i> on the favourites page, and the up, down and OK hints while you're moving something. Pages slide round the ring as you turn it, and the rows of the page you land on come in one after another.</p>
   <p>LG's own Home is under Settings, <i>LG Home</i>. Opening it from there leaves it open. The Home button always comes back to Tiles Home.</p>
+  <h3>Stop LG's Home flashing up first</h3>
+  <p>The kit doesn't change LG's launcher, so pressing Home still starts LG's Home, and the kit then puts Tiles Home on top. Two steps make that flash shorter or remove it:</p>
+  <ol>
+   <li><b>Give the kit your Home key code.</b> SSH into the TV and run <code>node /var/lib/webosbrew/lgkit/find-home-key.js</code>, press Home, then run setup again with <code>--home-code N</code>. Tiles Home is then opened the moment you press the key, instead of when LG's Home has already appeared. There's often still a short flash, because LG's Home starts at the same moment.</li>
+   <li><b>To remove it completely:</b> install <a href="https://repo.webosbrew.org/apps/org.webosbrew.inputhook/">LG Input Hook</a> from Homebrew Channel. It's a separate community app that remaps remote buttons before webOS sees them. In its interface, find the Home button's ID in its log, then use <i>Add keybind</i> with <i>Execute</i> and this command:
+<pre>luna-send -n 1 luna://com.webos.applicationManager/launch '{"id":"io.github.lgprivacykit.tiles"}'</pre>
+   Then the Home button never opens LG's Home at all. I haven't tested LG Input Hook. Its README doesn't say whether Execute fully replaces the button's normal action, so check after saving. If LG's Home still appears, the kit's redirect still catches it.</li>
+  </ol>
  </div>
 </section>
 
@@ -289,6 +298,7 @@ sh /var/lib/webosbrew/lgkit/install.sh --uninstall    # all of it off</pre>
    <li><b>LGWS's DNS filter</b> (off by default) redirects the TV's own DNS through a local helper. The kit leaves it off. If you turn it on, the kit's firewall still lets through whichever DNS server is in the TV's resolver settings, but I haven't tested the two together.</li>
    <li><b>The kit's own on-TV part</b> (agent, boot hook, firewall, uninstall) was run end to end on a stand-in TV, with a fake <code>luna-send</code> and fake remote key events. The hosts mounts and iptables were real, in an isolated container. The likeliest differences on your TV are LG Home's app id on your firmware (the agent watches the common ones), whether <code>iptables</code> is there (if not, it skips the firewall and says so), and whether the install service accepts the Tiles Home .ipk. If it doesn't, install the .ipk from Homebrew Channel. <code>install.sh --status</code> shows each of these.</li>
    <li><b>Found on a real 2023 TV (43UR81006LJ):</b> its <code>luna-send</code> prints replies only to a terminal, so the agent and installer now go through <code>script</code> when they get no reply, the same workaround LGWS uses. App installs are confirmed from the installed files, not from that output. Its <code>ip6tables</code> has no REJECT target, so IPv6 rules fall back to DROP. The installer ends with a list of what worked and what didn't, and exits with an error if anything failed.</li>
+   <li><b>Animations</b> use only transform and opacity, so the TV's graphics chip does the work. They were checked in desktop Chrome, not on the TV's slower processor.</li>
    <li><b>Settings:</b> the keys come from community notes and vary by firmware. Any your TV doesn't report are skipped.</li>
   </ul>
  </div>

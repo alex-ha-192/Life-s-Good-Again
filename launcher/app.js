@@ -198,15 +198,83 @@
     return '<div class="rows">' + out + "</div>";
   }
   function mod(i) { var n = st.pages.length; return ((i % n) + n) % n; }
-  function render() {
-    var html = "";
-    [-2, 2, -1, 1, 0].forEach(function (d) {
-      var p = mod(st.p + d), s = SLOTS[d];
-      html += '<section class="col' + (d < 0 ? " mir" : "") + '" data-d="' + d + '" style="left:' + (960 - W / 2 + s[0]) +
-        "px;transform:scale(" + s[1] + ");opacity:" + s[2] + '"><h2>' + esc(st.pages[p].h) + "</h2>" + listHTML(p, d === 0) + "</section>";
-    });
-    $("ring").innerHTML = html;
+  // One element per page, kept between renders, so CSS can animate the ring turning (Metro-style
+  // slide on transform/opacity only, which the TV's GPU handles). Only the list inside a page is
+  // rebuilt, and only when what it shows changes; moving the selection just moves a class.
+  var cols = [], lastD = [], lastSig = [], lastP = -1, firstPaint = true;
+  function placeCol(p) {
+    var n = st.pages.length, d = mod(p - st.p);
+    if (d > n / 2) d -= n;                       // -2..2
+    var s = SLOTS[d], el = cols[p];
+    // wrapping from one end of the ring to the other: jump, don't sweep across the screen
+    var jump = lastD[p] !== undefined && Math.abs(d - lastD[p]) > 2;
+    if (jump) el.classList.add("jump");
+    el.className = "col" + (d < 0 ? " mir" : "") + (d === 0 ? " on" : "") + (jump ? " jump" : "");
+    el.setAttribute("data-d", d);
+    el.style.transform = "translateX(" + s[0] + "px) scale(" + s[1] + ")";
+    el.style.opacity = s[2];
+    if (jump) { void el.offsetWidth; el.classList.remove("jump"); }
+    lastD[p] = d;
+    return d;
   }
+  function render() {
+    var ring = $("ring");
+    if (cols.length !== st.pages.length) {
+      ring.innerHTML = ""; cols = []; lastD = []; lastSig = [];
+      st.pages.forEach(function (pg, p) {
+        var el = document.createElement("section");
+        el.innerHTML = '<h2></h2><div class="body"></div>';
+        el.style.left = (960 - W / 2) + "px";
+        ring.appendChild(el); cols.push(el);
+      });
+    }
+    var turned = lastP !== st.p;
+    st.pages.forEach(function (pg, p) {
+      var d = placeCol(p), active = d === 0, el = cols[p];
+      el.firstChild.textContent = pg.h;
+      var items = pg.items, sel = st.sel[p];
+      var start = Math.max(0, Math.min(sel - VISIBLE + 2, items.length - VISIBLE));
+      var sig = [active, start, st.moving && active, items.map(function (x) { return x.id; }).join(","),
+                 st.favs.join(","), items.map(function (x) { return x.title; }).join(",")].join("|");
+      var body = el.lastChild;
+      if (sig !== lastSig[p]) { body.innerHTML = listHTML(p, active); lastSig[p] = sig; }
+      else {
+        var rows = body.querySelectorAll(".r");
+        for (var i = 0; i < rows.length; i++) {
+          var on = active && +rows[i].getAttribute("data-i") === sel;
+          rows[i].classList.toggle("f", on);
+          rows[i].classList.toggle("mv", on && st.moving);
+        }
+      }
+      // Metro "arrive": the page that lands in the middle brings its rows in one after another
+      if (active && (turned || firstPaint)) {
+        var rs = body.querySelectorAll(".r, .empty, .more");
+        for (var k = 0; k < rs.length; k++) {
+          rs[k].classList.remove("in"); void rs[k].offsetWidth;
+          rs[k].style.animationDelay = (k * 28) + "ms";
+          rs[k].classList.add("in");
+        }
+      }
+    });
+    if (firstPaint) { ring.classList.remove("boot"); void ring.offsetWidth; ring.classList.add("boot"); }
+    firstPaint = false; lastP = st.p;
+    hints();
+  }
+  // What the coloured buttons do right now, shown bottom left.
+  function hints() {
+    var it = current(), h = [];
+    var Y = '<i class="k y"></i>', R = '<i class="k r"></i>';
+    if (st.moving) {
+      h.push('<b>\u25B2\u25BC</b> move', "<b>OK</b> drop it here", "<b>Back</b> done");
+    } else {
+      if (it && !it.action) h.push(Y + (st.favs.indexOf(it.id) >= 0 ? " remove from favourites" : " add to favourites"));
+      if (st.p === 0 && st.pages[0].items.length > 1) h.push(R + " move");
+      h.push("<b>\u25C0 \u25B6</b> pages");
+      if (st.p !== 0) h.push("<b>Back</b> favourites");
+    }
+    $("hints").innerHTML = h.join('<span class="sep"></span>');
+  }
+  function replay() { firstPaint = true; }
   var toastTimer;
   function toast(msg) {
     var t = $("toast");
@@ -295,7 +363,7 @@
     if (i === st.sel[st.p]) return open(current());
     st.sel[st.p] = i; render();
   });
-  document.addEventListener("webOSRelaunch", function () { st.p = 0; st.moving = false; buildPages(); render(); maybeExtend(); });
+  document.addEventListener("webOSRelaunch", function () { st.p = 0; st.moving = false; replay(); buildPages(); render(); maybeExtend(); });
 
   // ------------------------------------------------------------------ clock
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -307,7 +375,7 @@
   }
   setInterval(tick, 10000);
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) { tick(); loadApps(function () { buildPages(); render(); maybeExtend(); }); }
+    if (!document.hidden) { tick(); replay(); loadApps(function () { buildPages(); render(); maybeExtend(); }); }
   });
 
   tick();
