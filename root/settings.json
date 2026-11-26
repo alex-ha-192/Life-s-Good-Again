@@ -45,12 +45,6 @@
   },
   {
    "category": "general",
-   "key": "homeAutoLaunch",
-   "value": "off",
-   "label": "Don't pop LG Home up at power-on"
-  },
-  {
-   "category": "general",
    "key": "noSignalScreenSaver",
    "value": "off",
    "label": "No-signal 'gallery' screensaver"

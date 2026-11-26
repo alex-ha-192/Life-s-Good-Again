@@ -46,7 +46,7 @@ SETTINGS = [
     ("ads",     "option",  "webOSPromotionVideo",   "off", "webOS promo video"),
     ("ads",     "option",  "promotionStreamer",     "off", "Promotion streamer overlay"),
     ("ads",     "general", "sportsAlarm",           "off", "Sports alerts pop-ups"),
-    ("home",    "general", "homeAutoLaunch",        "off", "Don't pop LG Home up at power-on"),
+    # homeAutoLaunch is left alone: with Home Chooser, "Home" at power-on means Tiles Home, so it's yours to set.
     ("home",    "general", "noSignalScreenSaver",   "off", "No-signal 'gallery' screensaver (downloads images)"),
 ]
 PROFILES = ["privacy", "ads", "home"]
@@ -65,7 +65,8 @@ Menu names are for webOS 23; wording varies slightly by region.
        Turn ON 'Limit Ad Tracking' (US) and OFF 'Personalised Advertising'.
        Use 'Reset Advertising ID' once.
   3. Settings > All Settings > General > System > Additional Settings > Home Settings
-       Turn OFF 'Home Promotion', 'Content Recommendation', 'Home Auto Launch'.
+       Turn OFF 'Home Promotion' and 'Content Recommendation'. 'Home Auto Launch' is up to you
+       (with Tiles Home chosen in Home Chooser, ON opens Tiles Home at power-on).
   4. Settings > All Settings > General > AI Service (or AI Settings)
        Turn OFF 'AI Recommendation', 'Smart Tips', voice data collection and
        any 'Always Ready' / always-listening option.

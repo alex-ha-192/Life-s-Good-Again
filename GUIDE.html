@@ -97,7 +97,7 @@ html{scroll-padding-top:20px}
   <div>
    <h2>What you get</h2>
    <div class="stack">
-    <div class="layer root"><span class="tag">Kit</span><b>Tiles Home is your home</b><span>The Home button, power-on and waking from standby all open Tiles Home. LG's own Home is still there under Settings in Tiles Home.</span></div>
+    <div class="layer root"><span class="tag">Kit</span><b>Tiles Home is your home</b><span>Tiles Home declares itself a Home app, and Home Chooser from Homebrew Channel puts it on the Home button. LG's own Home is still there under Settings in Tiles Home.</span></div>
     <div class="layer root"><span class="tag">LGWS</span><b>LG's spying switched off</b><span>Life's Good Without Spying blocks LG's ad, ACR and telemetry hosts in the TV's own hosts file. It also stops LG's ad, ACR, telemetry and voice services and wipes their buffered files. It works on any network, with no Pi-hole.</span></div>
     <div class="layer root"><span class="tag">Kit</span><b>Extra names on top</b><span>About 1,000 more names that list doesn't have: LG's per-country ad servers and the DNS-over-HTTPS services.</span></div>
     <div class="layer root"><span class="tag">Kit</span><b>Firewall</b><span>Apps can't go around that list by asking a public DNS server directly or by using DNS-over-TLS. Your own DNS server is always left alone.</span></div>
@@ -126,7 +126,7 @@ html{scroll-padding-top:20px}
     <tr><td data-l="Job"><b>Per-country ad servers, DoH services</b></td><td data-l="By">Kit</td><td data-l="Notes">About 1,000 names LGWS's list doesn't have, added after its block. LGWS keeps lines other tools add there, so they survive its own updates.</td></tr>
     <tr><td data-l="Job"><b>Firewall against DNS bypass</b></td><td data-l="By">Kit</td><td data-l="Notes">Public resolvers and DNS-over-TLS. LGWS's own DNS filter is a different thing, and the kit leaves it off. See <a href="#unverified">Not yet tested</a>.</td></tr>
     <tr><td data-l="Job"><b>Privacy settings guard</b></td><td data-l="By">Kit</td><td data-l="Notes">LGWS doesn't touch settings such as Live Plus or Home promotion. The kit's agent re-checks them every 6 hours.</td></tr>
-    <tr><td data-l="Job"><b>Tiles Home on Home, power-on and wake</b></td><td data-l="By">Kit</td><td data-l="Notes">Not something LGWS does.</td></tr>
+    <tr><td data-l="Job"><b>Tiles Home on the Home button</b></td><td data-l="By">Home Chooser</td><td data-l="Notes">Tiles Home declares <code>"appCategory": ["home"]</code>. You pick it once in Home Chooser.</td></tr>
    </tbody>
   </table></div>
   <p>The installer checks whether LGWS is installed. If it isn't, <code>setup.py</code> downloads LGWS's latest release on your computer, so the TV doesn't need to reach GitHub. It checks the file against the SHA-256 in LGWS's own release manifest and sends it over with the kit, and the TV checks it again before installing. You can also install it yourself first, from Homebrew Channel. Then the installer sets LGWS's options to match yours and switches its protection on. You can open the LGWS app afterwards to look or change things. The kit's extras stay in place.</p>
@@ -150,10 +150,10 @@ html{scroll-padding-top:20px}
 python3 setup.py --root --skip dns,router               # do it (finds the TV; or add --tv 192.168.1.50)</pre>
   <ol class="steps">
    <li><h3>Pair</h3><p>Accept the prompt that appears on the TV. This is the same pairing LG's phone app uses.</p></li>
-   <li><h3>Privacy settings</h3><p>It backs up your current settings, then turns off Live Plus (ACR), home promotions, the promo video, sports alerts, recommendations and Home Auto Launch.</p></li>
+   <li><h3>Privacy settings</h3><p>It backs up your current settings, then turns off Live Plus (ACR), home promotions, the promo video, sports alerts and recommendations. It leaves Home Auto Launch alone.</p></li>
    <li><h3>On-screen switches</h3><p>It opens the right Settings pages and tells you what to untick. See step 3.</p></li>
    <li><h3>Tiles Home</h3><p>It takes a snapshot of your installed apps and icons and builds Tiles Home with them.</p></li>
-   <li><h3>On the TV</h3><p>It copies the kit to the TV over SSH, where ssh asks for the root password, and runs the installer there. The installer installs and switches on Life's Good Without Spying, then adds the kit's extra names and the firewall. It also starts the agent that handles the Home button, power-on and the settings guard. A boot hook brings all of it back after every restart. LGWS can take a minute or two to apply.</p></li>
+   <li><h3>On the TV</h3><p>It copies the kit to the TV over SSH, where ssh asks for the root password, and runs the installer there. The installer installs and switches on Life's Good Without Spying, then adds the kit's extra names and the firewall. It also starts the agent that runs the settings guard. A boot hook brings all of it back after every restart. LGWS can take a minute or two to apply.</p></li>
   </ol>
   <div class="note"><b>If the root step stops with "Life's Good Without Spying isn't on the TV",</b> nothing on the TV has been changed. On the TV, open Homebrew Channel and install <i>Life's Good Without Spying</i>, then run the same command again. Or add <code>--no-lgws</code> to use the kit's own blocklist instead. The line above that message says why it failed: no route to GitHub, a certificate problem on the TV, or a damaged copy.</div>
   <div class="note ok">When it finishes, press Home on the remote: Tiles Home should open. A summary is saved to <code>~/.config/lgtv-privacy/setup-report.html</code>. You can put the laptop away now.</div>
@@ -189,7 +189,6 @@ python3 setup.py --root --skip dns,router               # do it (finds the TV; o
     <tr><td><code>--root-tiers base,strict,doh</code></td><td>The most blocking. It adds the kit's strict names and turns on LGWS's Content Store, Home sessions, ThinQ and LG Channels categories. It also stops app updates, LG account, Search and some Home previews. The default is <code>base,doh</code>.</td></tr>
     <tr><td><code>--block-updates</code></td><td>Blocks LG firmware and app updates, through LGWS's updates category, so an update can't take root away. You also miss LG's security fixes. Homebrew Channel has its own firmware switch too.</td></tr>
     <tr><td><code>--no-lgws</code></td><td>Leave LGWS out. The kit puts its own whole list in <code>/etc/hosts</code> instead, and no services are stopped.</td></tr>
-    <tr><td><code>--home-code N</code></td><td>Your remote's Home key code, so the Home button is caught the instant you press it, not when LG's Home appears. Without it you may see LG's Home for a moment. To find it, SSH into the TV, run <code>node /var/lib/webosbrew/lgkit/find-home-key.js</code>, and press Home.</td></tr>
     <tr><td><code>--root-key ~/.ssh/key</code></td><td>Log in with an SSH key instead of the password.</td></tr>
     <tr><td><code>--tv 192.168.1.50</code></td><td>Use this address instead of searching the network.</td></tr>
    </tbody>
@@ -200,11 +199,11 @@ python3 setup.py --root --skip dns,router               # do it (finds the TV; o
 <section class="band" id="phone">
  <div class="wrap">
   <h2>No laptop to hand? From a phone</h2>
-  <p>Install <b>Life's Good Without Spying</b> from Homebrew Channel first, so the TV doesn't need to download it. This installs the on-TV part only: LGWS settings, extras, firewall, Home button and guard. The guard switches the privacy settings off within a minute anyway. Any SSH app works, for example Termux on Android. Copy <code>dist/lgkit-root.tar.gz</code> from the kit to the phone, then:</p>
+  <p>Install <b>Life's Good Without Spying</b> from Homebrew Channel first, so the TV doesn't need to download it. This installs the on-TV part only: LGWS settings, extras, firewall and guard. The guard switches the privacy settings off within a minute anyway. Any SSH app works, for example Termux on Android. Copy <code>dist/lgkit-root.tar.gz</code> from the kit to the phone, then:</p>
 <pre>scp lgkit-root.tar.gz root@192.168.1.50:/tmp/
 ssh root@192.168.1.50
 mkdir -p /tmp/kit &amp;&amp; tar -xzf /tmp/lgkit-root.tar.gz -C /tmp/kit &amp;&amp; sh /tmp/kit/root/install.sh</pre>
-  <p><code>install.sh --help</code> lists the same options: <code>--keep-store</code>, <code>--keep-voice</code>, <code>--tiers</code>, <code>--block-updates</code>, <code>--home-code</code>, <code>--no-lgws</code>. Tiles Home from the bundle shows apps from the TV's live list. Running setup from a laptop also bakes in your app icons.</p>
+  <p><code>install.sh --help</code> lists the same options: <code>--keep-store</code>, <code>--keep-voice</code>, <code>--tiers</code>, <code>--block-updates</code>, <code>--no-lgws</code>. Tiles Home from the bundle shows apps from the TV's live list. Running setup from a laptop also bakes in your app icons.</p>
  </div>
 </section>
 
@@ -224,16 +223,16 @@ mkdir -p /tmp/kit &amp;&amp; tar -xzf /tmp/lgkit-root.tar.gz -C /tmp/kit &amp;&a
       <tr><td data-l="Remote"><b>Pointer</b></td><td data-l="Does">Click a side page to turn to it; click a row once to select it and again to open it.</td></tr>
      </tbody>
     </table></div>
-  <p>The bottom left of the screen always shows what the buttons do right now. For example, it shows <i>yellow: add to favourites</i> or <i>remove from favourites</i> for the selected item, <i>red: move</i> on the favourites page, and the up, down and OK hints while you're moving something. Pages slide round the ring as you turn it, and the rows of the page you land on come in one after another.</p>
+  <p>The bottom left of the screen always shows what the buttons do right now. For example, it shows <i>yellow: add to favourites</i> or <i>remove from favourites</i> for the selected item, <i>red: move</i> on the favourites page, and the up, down and OK hints while you're moving something. Animations are off by default. Settings, <i>Animations</i> turns on a short slide between pages, and Settings, <i>Speed readout</i> shows how long a key press takes to reach the screen on your TV.</p>
   <p>LG's own Home is under Settings, <i>LG Home</i>. Opening it from there leaves it open. The Home button always comes back to Tiles Home.</p>
-  <h3>Stop LG's Home flashing up first</h3>
-  <p>The kit doesn't change LG's launcher, so pressing Home still starts LG's Home, and the kit then puts Tiles Home on top. Two steps make that flash shorter or remove it:</p>
+  <h3>Put Tiles Home on the Home button</h3>
   <ol>
-   <li><b>Give the kit your Home key code.</b> SSH into the TV and run <code>node /var/lib/webosbrew/lgkit/find-home-key.js</code>, press Home, then run setup again with <code>--home-code N</code>. Tiles Home is then opened the moment you press the key, instead of when LG's Home has already appeared. There's often still a short flash, because LG's Home starts at the same moment.</li>
-   <li><b>To remove it completely:</b> install <a href="https://repo.webosbrew.org/apps/org.webosbrew.inputhook/">LG Input Hook</a> from Homebrew Channel. It's a separate community app that remaps remote buttons before webOS sees them. In its interface, find the Home button's ID in its log, then use <i>Add keybind</i> with <i>Execute</i> and this command:
-<pre>luna-send -n 1 luna://com.webos.applicationManager/launch '{"id":"io.github.lgprivacykit.tiles"}'</pre>
-   Then the Home button never opens LG's Home at all. I haven't tested LG Input Hook. Its README doesn't say whether Execute fully replaces the button's normal action, so check after saving. If LG's Home still appears, the kit's redirect still catches it.</li>
+   <li>In Homebrew Channel, install <a href="https://github.com/webosbrew/home-chooser">Home Chooser</a> and open it once.</li>
+   <li>In its panel, move to <i>Tiles Home</i>, press OK and confirm <i>Use Tiles Home as Home?</i></li>
+   <li>Press Home. Tiles Home opens instead of LG's Home, with no flash, and the choice stays after restarts.</li>
+   <li>To open Tiles Home at power-on, turn on <i>Home Auto Launch</i> (Settings, General, System, Additional Settings, Home Settings). The kit no longer turns it off.</li>
   </ol>
+  <p>To go back, open Home Chooser and pick <i>LG Home (Fullscreen)</i>. Home Chooser lists Tiles Home because its <code>appinfo.json</code> says <code>"appCategory": ["home"]</code>. The kit no longer watches the Home button or LG's Home itself.</p>
  </div>
 </section>
 
@@ -296,9 +295,9 @@ sh /var/lib/webosbrew/lgkit/install.sh --uninstall    # all of it off</pre>
    <li><b>Life's Good Without Spying is third-party.</b> I read its README, its control script and its list format, and checked the setting names and paths the kit uses against its source (version 0.12.3, last changed 23 Nov 2026). I haven't audited all of its roughly 2,700 lines of shell, and I haven't run it. Its README says most of its code was written by AI and tested on the author's own TVs: webOS 23 (LG G4), webOS 25 and webOS 4.4. The kit checks the download against the SHA-256 in LGWS's own release manifest. That catches a corrupted download, but it can't vouch for the code itself.</li>
    <li><b>The kit's use of LGWS</b> was tested against a stand-in that behaves like LGWS's control script: settings, enable, apply, status and disable. Covered: extras added after its block, extras kept when it re-applies, and uninstall switching it off only if the kit had switched it on. Downloading the real LGWS release on the computer was tested, with its SHA-256 matching its manifest, and so was installing that copy through the stand-in. If both that and the TV's own download fail, the installer stops before changing anything and says why.</li>
    <li><b>LGWS's DNS filter</b> (off by default) redirects the TV's own DNS through a local helper. The kit leaves it off. If you turn it on, the kit's firewall still lets through whichever DNS server is in the TV's resolver settings, but I haven't tested the two together.</li>
-   <li><b>The kit's own on-TV part</b> (agent, boot hook, firewall, uninstall) was run end to end on a stand-in TV, with a fake <code>luna-send</code> and fake remote key events. The hosts mounts and iptables were real, in an isolated container. The likeliest differences on your TV are LG Home's app id on your firmware (the agent watches the common ones), whether <code>iptables</code> is there (if not, it skips the firewall and says so), and whether the install service accepts the Tiles Home .ipk. If it doesn't, install the .ipk from Homebrew Channel. <code>install.sh --status</code> shows each of these.</li>
+   <li><b>The kit's own on-TV part</b> (agent, boot hook, firewall, uninstall) was run end to end on a stand-in TV, with a fake <code>luna-send</code>. The hosts mounts and iptables were real, in an isolated container. The likeliest differences on your TV are whether <code>iptables</code> is there (if not, it skips the firewall and says so), and whether the install service accepts the Tiles Home .ipk. If it doesn't, install the .ipk from Homebrew Channel. <code>install.sh --status</code> shows each of these.</li>
    <li><b>Found on a real 2023 TV (43UR81006LJ):</b> its <code>luna-send</code> prints replies only to a terminal, so the agent and installer now go through <code>script</code> when they get no reply, the same workaround LGWS uses. App installs are confirmed from the installed files, not from that output. Its <code>ip6tables</code> has no REJECT target, so IPv6 rules fall back to DROP. The installer ends with a list of what worked and what didn't, and exits with an error if anything failed.</li>
-   <li><b>Animations</b> use only transform and opacity, so the TV's graphics chip does the work. They were checked in desktop Chrome, not on the TV's slower processor.</li>
+   <li><b>Animations</b> are off by default, so moving between tiles is instant. If you want a short slide between pages, turn it on in Tiles Home under Settings, Animations. Key response was measured on a desktop CPU slowed down 8 times, not on the TV itself.</li>
    <li><b>Settings:</b> the keys come from community notes and vary by firmware. Any your TV doesn't report are skipped.</li>
   </ul>
  </div>
@@ -309,7 +308,7 @@ sh /var/lib/webosbrew/lgkit/install.sh --uninstall    # all of it off</pre>
   <h2>Sources</h2>
   <ul>
    <li><a href="https://github.com/lewisdoesstuff/lifesgoodwithoutspying">Life's Good Without Spying (source, README)</a> · <a href="https://repo.webosbrew.org/apps/ooo.lew.lifesgoodwithoutspying/">its Homebrew Channel listing</a></li>
-   <li><a href="https://cani.rootmy.tv/">cani.rootmy.tv</a> · <a href="https://www.webosbrew.org/">webOS Homebrew</a> · <a href="https://github.com/webosbrew/webos-homebrew-channel">Homebrew Channel (SSH, init.d, failsafe)</a> · <a href="https://www.webosbrew.org/develop/guides/startup-script/">startup scripts guide</a></li>
+   <li><a href="https://cani.rootmy.tv/">cani.rootmy.tv</a> · <a href="https://www.webosbrew.org/">webOS Homebrew</a> · <a href="https://github.com/webosbrew/webos-homebrew-channel">Homebrew Channel (SSH, init.d, failsafe)</a> · <a href="https://www.webosbrew.org/develop/guides/startup-script/">startup scripts guide</a> · <a href="https://github.com/webosbrew/home-chooser">Home Chooser</a> (<a href="https://github.com/webosbrew/home-chooser/blob/main/docs/launcher-api.md">launcher API: appCategory home</a>)</li>
    <li><a href="https://github.com/hagezi/dns-blocklists">HaGeZi LG webOS tracker list</a> · <a href="https://github.com/Perflyst/PiHoleBlocklist">Perflyst SmartTV list</a> · <a href="https://github.com/hugobatista/lg-tv-ad-block/">lg-tv-ad-block</a></li>
    <li><a href="https://gist.github.com/D-Rekk/468e559e823106afea72689d1e2aa1f1">webos-debloat settings keys</a> · <a href="https://www.webosbrew.org/pages/hidden-system-settings">hidden system settings</a> · <a href="https://github.com/hbertsch/lgtv-webos-root-launcher">rooted-launcher approach</a></li>
    <li><a href="https://github.com/chros73/bscpylgtv">bscpylgtv (alert-based luna calls)</a> · <a href="https://github.com/klattimer/LGWebOSRemote">LGWebOSRemote (pairing manifest)</a></li>
