@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /* Tiles Home v2 - a ring of five pages for LG webOS (Developer Mode app). Original design.
  * Left/right: previous/next page (wraps). Up/down: move through the page's list. OK: open.
  * Yellow: add/remove favourite (the item stays on its own page). Red (on favourites): pick up, move, OK to drop.

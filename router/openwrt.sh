@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # OpenWrt 22.03+ (firewall4). Paste over SSH, after replacing TV_MAC / PIHOLE_IP.
 # Everything matches the TV by MAC, so it covers its IPv4 and IPv6 addresses.
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
 /* LG TV Privacy Kit - on-TV agent. ROOTED TVs ONLY (Homebrew Channel with root).
  *
  * Started at boot by lgkit-boot.sh (through Homebrew Channel's init.d). Runs on the TV itself,

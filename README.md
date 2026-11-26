@@ -35,4 +35,10 @@ Python 3.8+ on the laptop, no extra packages. `undo` (or `install.sh --uninstall
 | `tools/` | `.ipk` builder, blocklist builder, DNS bypass checker, mock TV for testing |
 | `design/` | Interactive layout mockups |
 
-Unofficial; not affiliated with LG. Tiles Home is an original design. The bundled Open Sans font is under the SIL Open Font License (`launcher/fonts/OFL.txt`).
+## Licence
+
+GPL-3.0-or-later. You can use, change and share this kit. If you distribute anything built from it, that has to be under the GPL too, with its source. See [LICENSE](LICENSE).
+
+Not covered by the GPL: the bundled Open Sans font (SIL Open Font License, `launcher/fonts/OFL.txt`), and Life's Good Without Spying (MIT, by lewisdoesstuff), which setup downloads from its own release and which isn't in this repository.
+
+Unofficial; not affiliated with LG. Tiles Home is an original design.

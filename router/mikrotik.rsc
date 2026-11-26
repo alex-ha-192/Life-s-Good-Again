@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # MikroTik RouterOS 7. Paste in Terminal after replacing TV_IP / PIHOLE_IP.
 # Give the TV a static DHCP lease first so TV_IP never changes.
 

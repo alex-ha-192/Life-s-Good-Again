@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tiny fake LG TV (SSAP over ws://127.0.0.1:3000) for testing lgtv_privacy.py
 without touching a real TV.
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Package ../launcher into a webOS .ipk (no LG SDK needed).
 
     python3 tools/build_ipk.py            -> dist/io.github.lgprivacykit.tiles_1.0.0_all.ipk

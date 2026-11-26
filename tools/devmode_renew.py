@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Kept for compatibility. Developer Mode renewal now lives in ../lgtv_devmode.py:
 
     python3 lgtv_devmode.py renew --force     # extend now

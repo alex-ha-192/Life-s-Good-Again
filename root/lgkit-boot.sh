@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # LG TV Privacy Kit - boot hook. ROOTED TVs ONLY (Homebrew Channel with root).
 # install.sh links this as /var/lib/webosbrew/init.d/60-lgkit, so Homebrew Channel runs it at
 # every boot, after Life's Good Without Spying's own hook (50-...). It finishes in about a second

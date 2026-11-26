@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 lgtv_devmode.py - keep LG's Developer Mode session from expiring, on a timer.
 

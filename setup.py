@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 setup.py - one run that sets up the whole kit on a stock (unrooted) LG TV.
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Build every blocklist format from blocklist/src/*.txt.
 
     python3 tools/build_blocklists.py

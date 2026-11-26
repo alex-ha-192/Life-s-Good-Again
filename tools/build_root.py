@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Bundle the rooted-TV part of the kit.
 
     python3 tools/build_root.py        -> root/settings.json and dist/lgkit-root.tar.gz

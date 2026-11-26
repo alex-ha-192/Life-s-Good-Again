@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # LG TV Privacy Kit - installer for ROOTED TVs (Homebrew Channel with root). Runs ON THE TV, as root.
 #
 # Easiest: from a laptop, once:   python3 setup.py --root          (copies the kit over SSH and runs this)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 lgtv_privacy.py - pair with an LG webOS TV over your LAN, audit and switch off
 ads / promotions / ACR ("Live Plus"), and help set up the Tiles Home launcher.

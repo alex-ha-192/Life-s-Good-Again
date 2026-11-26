@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Check that your DNS block works and that devices can't go around it.
 
     python3 tools/dns_check.py --dns 192.168.1.2          # your Pi-hole / AdGuard Home IP

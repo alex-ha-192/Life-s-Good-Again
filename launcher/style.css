@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Tiles Home v2: a ring of five pages (left/right), each a list of icon + title rows (up/down).
    Original design. Type: Segoe UI if the device has it, otherwise the bundled Open Sans (OFL, fonts/OFL.txt). */
 @font-face { font-family: "Tiles Sans"; font-weight: 300; src: local("Segoe UI Light"), local("SegoeUI-Light"), url(fonts/OpenSans-300.ttf); }
