@@ -60,7 +60,7 @@ Menu names are for webOS 23; wording varies slightly by region.
        Interest-Based Advertising, Content Recommendation, Live Plus, etc.
        (Keep only the core 'Terms of Use' if you still want the app store.)
        LG can re-tick these after a network change or update: the scheduled
-       guard re-checks the settings it can read and warns you on the TV.
+       guard re-checks the settings it can read and quietly turns them back.
   2. Settings > All Settings > General > System > Additional Settings > Advertisement
        Turn ON 'Limit Ad Tracking' (US) and OFF 'Personalised Advertising'.
        Use 'Reset Advertising ID' once.

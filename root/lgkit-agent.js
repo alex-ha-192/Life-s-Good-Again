@@ -4,7 +4,8 @@
  * Started at boot by lgkit-boot.sh (through Homebrew Channel's init.d). Runs on the TV itself,
  * so no computer has to stay on. It does one thing: every GUARD_HOURS (default 6), and a minute
  * after each power-on or wake, it re-reads the kit's privacy settings and turns back off anything a
- * firmware update or LG turned on. If it changes anything, it shows a short message on the TV.
+ * firmware update or LG turned on. It does this silently; changes are
+ * written to agent.log and status.json.
  *
  * It doesn't touch the Home button: Tiles Home declares itself a Home app, and Home Chooser
  * (org.webosbrew.homechooser, from Homebrew Channel) makes the Home button open it.
@@ -75,9 +76,6 @@ function subscribe(uri, params) {
   var c = lunaArgs(["-i", uri, JSON.stringify(params)]);
   return cp.spawn(c.cmd, c.args);
 }
-function toast(msg) {
-  luna("luna://com.webos.notification/createToast", { sourceId: "io.github.lgprivacykit.tiles", message: msg }, function () {});
-}
 
 // ------------------------------------------------------------------ power-on / wake
 function onPowerOn(reason) {
@@ -117,7 +115,7 @@ function guard(done) {
     if (i >= list.length) {
       status.guardRuns++; status.lastGuard = new Date().toISOString(); status.lastGuardChanged = changed; saveStatus();
       log("guard: " + (changed.length ? "turned back off " + changed.join(", ") : "all " + list.length + " settings as set"));
-      if (changed.length) toast("Privacy Kit turned back off: " + changed.join(", "));
+      // silent by design: what changed goes to agent.log and status.json, never on screen
       if (done) done(changed);
       return;
     }
