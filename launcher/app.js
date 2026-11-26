@@ -42,6 +42,38 @@
   HIDE[SELF] = 1;
 
   var CFG = { rooted: false };   // config.json, written by tools/build_ipk.py (--rooted)
+  // ---- themes: colours only, set as CSS variables, so changing one never rebuilds the screen
+  var THEME_KEY = "tileshome.theme";
+  function rgba(hex, a) { var n = parseInt(hex.slice(1), 16); return "rgba(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + "," + a + ")"; }
+  var THEMES = [{ id: "midnight", name: "Midnight", sw: "#1f5fbf", bg: "#0a1830", acc: "#8ff0e3", sel: "rgba(255,255,255,.13)", frame: "#fff", t: "#fff" }];
+  [["lime", "Lime", "#a4c400"], ["orange", "Orange", "#ff5a00"], ["magenta", "Magenta", "#e3008c"],
+   ["blue", "Blue", "#1ba1e2"], ["red", "Red", "#e51400"], ["teal", "Teal", "#00aba9"]].forEach(function (a) {
+    THEMES.push({ id: "graphite-" + a[0], name: "Graphite, " + a[1].toLowerCase(), sw: a[2], bg: "#181818", acc: a[2], sel: rgba(a[2], 0.16), frame: a[2], t: "#a8a8a8" });
+  });
+  var themeIdx = 0;
+  function applyTheme(i) {
+    themeIdx = i; var th = THEMES[i], s = document.documentElement.style;
+    s.setProperty("--bg", th.bg); s.setProperty("--acc", th.acc); s.setProperty("--sel", th.sel);
+    s.setProperty("--frame", th.frame); s.setProperty("--t", th.t);
+  }
+  (function () {
+    var id = null; try { id = localStorage.getItem(THEME_KEY); } catch (e) {}
+    for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === id) { applyTheme(i); return; }
+    applyTheme(0);
+  })();
+  var dd = { open: false };   // Settings > Theme expanded in place, its options listed under the row
+  var SETTINGS_P = 4;
+  function themeRow() { var it = st.pages[SETTINGS_P].items; for (var i = 0; i < it.length; i++) if (it[i].action === "theme") return i; return 0; }
+  function optRange() { var it = st.pages[SETTINGS_P].items, lo = -1, hi = -1; for (var i = 0; i < it.length; i++) if (it[i].action === "themeopt") { if (lo < 0) lo = i; hi = i; } return [lo, hi]; }
+  function setDD(open) {
+    dd.open = open; buildPages();
+    st.sel[SETTINGS_P] = open ? optRange()[0] + themeIdx : themeRow();
+    schedule();
+  }
+  function chooseTheme(i) {
+    applyTheme(i); try { localStorage.setItem(THEME_KEY, THEMES[i].id); } catch (e) {}
+    setDD(false);
+  }
   var MOTION_KEY = "tileshome.motion";
   function motionOn() { try { return localStorage.getItem(MOTION_KEY) === "on"; } catch (e) { return false; } }
   var st = { apps: [], pages: [], p: 0, sel: [0, 0, 0, 0, 0], favs: [], moving: false };
@@ -124,10 +156,16 @@
       { id: "com.palmdts.devmode", title: "Developer Mode", glyph: "code", color: "#39414b" },
       { id: "com.webos.app.home", title: "LG Home", glyph: "home", color: "#39414b" },
       { action: "extend", id: "tiles:extend", title: devTitle(), glyph: "renew", color: "#39414b" },
+      { action: "theme", id: "tiles:theme", title: "Theme: " + THEMES[themeIdx].name, glyph: "gear", color: "#39414b" },
       { action: "motion", id: "tiles:motion", title: motionOn() ? "Animations: on" : "Animations: off", glyph: "renew", color: "#39414b" },
       { action: "speed", id: "tiles:speed", title: speedOn ? "Speed readout: on" : "Speed readout: off", glyph: "code", color: "#39414b" },
       { action: "reset", id: "tiles:reset", title: "Reset favourites", glyph: "reset", color: "#39414b" }
     ].filter(function (x) { return hasDevMode() || (x.id !== "com.palmdts.devmode" && x.action !== "extend"); });
+    if (dd.open) {
+      var ti = 0; settings.forEach(function (x, i) { if (x.action === "theme") ti = i; });
+      var opts = THEMES.map(function (t, i) { return { action: "themeopt", idx: i, id: "tiles:theme:" + i, title: t.name, sw: t.sw, cur: i === themeIdx, sub: true }; });
+      settings.splice.apply(settings, [ti + 1, 0].concat(opts));
+    }
     var all = {};
     [apps, inputs, media, settings].forEach(function (l) { l.forEach(function (x) { if (!all[x.id]) all[x.id] = x; }); });
     // Favourites whose app isn't installed right now are kept in storage but not shown.
@@ -198,6 +236,10 @@
     for (var i = start; i < Math.min(items.length, start + VISIBLE); i++) {
       var it = items[i], f = active && i === sel;
       var fav = p !== 0 && !it.action && st.favs.indexOf(it.id) >= 0;
+      if (it.sub) {
+        out += '<div class="r sub' + (f ? " f" : "") + '" data-i="' + i + '"><span class="sw" style="background:' + it.sw + '"></span><span class="t">' + esc(it.title) + "</span>" + (it.cur ? '<span class="tick">\u2713</span>' : "") + "</div>";
+        continue;
+      }
       out += '<div class="r' + (f ? " f" : "") + (f && st.moving ? " mv" : "") + '" data-i="' + i + '">' +
         iconHTML(it) + '<span class="t">' + esc(it.title) + "</span>" + (fav ? STAR : "") + "</div>";
     }
@@ -261,6 +303,7 @@
   var lastHints = "";
   function hints() {
     var it = current(), h = [];
+    if (dd.open) { var hh = "<b>\u25B2\u25BC</b> choose" + '<span class="sep"></span>' + "<b>OK</b> use this theme" + '<span class="sep"></span>' + "<b>Back</b> close"; if (hh !== lastHints) { $("hints").innerHTML = hh; lastHints = hh; } return; }
     var Y = '<i class="k y"></i>', R = '<i class="k r"></i>';
     if (st.moving) {
       h.push('<b>\u25B2\u25BC</b> move', "<b>OK</b> drop it here", "<b>Back</b> done");
@@ -288,6 +331,8 @@
   function open(it) {
     if (!it) return;
     if (it.action === "extend") return extendDevMode(true);
+    if (it.action === "theme") return setDD(!dd.open);
+    if (it.action === "themeopt") return chooseTheme(it.idx);
     if (it.action === "motion") {
       try { localStorage.setItem(MOTION_KEY, motionOn() ? "off" : "on"); } catch (e) {}
       document.body.classList.toggle("motion", motionOn());
@@ -329,6 +374,15 @@
   }
 
   function key(code) {
+    if (dd.open) {
+      var rg = optRange(), p0 = st.sel[SETTINGS_P];
+      if (code === KEY.UP) st.sel[SETTINGS_P] = Math.max(rg[0], p0 - 1);
+      else if (code === KEY.DOWN) st.sel[SETTINGS_P] = Math.min(rg[1], p0 + 1);
+      else if (code === KEY.OK) { open(current()); return true; }
+      else if (code === KEY.BACK || code === KEY.ESC || code === KEY.LEFT || code === KEY.RIGHT) { setDD(false); return true; }
+      schedule();
+      return true;
+    }
     if (st.moving) {
       if (code === KEY.UP) moveFav(-1);
       else if (code === KEY.DOWN) moveFav(1);
@@ -417,7 +471,7 @@
     if (i === st.sel[st.p]) return open(current());
     st.sel[st.p] = i; render();
   });
-  document.addEventListener("webOSRelaunch", function () { st.p = 0; st.moving = false; replay(); buildPages(); render(); maybeExtend(); });
+  document.addEventListener("webOSRelaunch", function () { st.p = 0; st.moving = false; dd.open = false; replay(); buildPages(); render(); maybeExtend(); });
 
   // ------------------------------------------------------------------ clock
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
